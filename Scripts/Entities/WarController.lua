@@ -5,24 +5,37 @@ WarConstants = {
 	troopCost = 100,
 	cumanSoldier = "4957c994-1489-f528-130c-a00b9838a4a5",
 	ratSoldier = "43b48356-ecf4-5e6e-bce4-1d98ed745baa",
-	numWaves = 1,
+	numWaves = 5,
 	corpseTime = 5000, --5 seconds
 	victoryTime = 30000, -- 30 seconds
-	waveInterval = 5000 -- 35 seconds
+	waveInterval = 40000 -- 40 seconds
+}
+
+WarTypes = {
+	commander = 0,
+	knight = 1,
+	halberd = 2,
+	aux = 3,
+	bow = 4,
+	halberd_light = 5,
+	aux_light = 6
 }
 
 WarGuids = {
-	rat = {
-		knight="41429725-5368-3cb1-6440-2e2e02b4fc97",
-		halberd="43b48356-ecf4-5e6e-bce4-1d98ed745baa",
-		aux="4aa17e70-525a-1e83-d32f-adf2f8c60daf"
-	},
-	cuman = {
-		knight="49c00005-e5e9-ee50-7370-8bc12c8ad29f",
-		halberd="4957c994-1489-f528-130c-a00b9838a4a5",
-		aux="4c4f6e9d-aa80-4f1b-a9d9-62573e6de2a7"
-	}
+	knight = {},
+	halberd = {},
+	aux = {}
 }
+
+WarGuids[WarTypes.knight] = {}
+WarGuids[WarTypes.knight][WarConstants.rat_side] = "41429725-5368-3cb1-6440-2e2e02b4fc97"
+WarGuids[WarTypes.knight][WarConstants.cuman_side] = "49c00005-e5e9-ee50-7370-8bc12c8ad29f"
+WarGuids[WarTypes.halberd] = {}
+WarGuids[WarTypes.halberd][WarConstants.rat_side] = "43b48356-ecf4-5e6e-bce4-1d98ed745baa"
+WarGuids[WarTypes.halberd][WarConstants.cuman_side] = "4957c994-1489-f528-130c-a00b9838a4a5"
+WarGuids[WarTypes.aux] = {}
+WarGuids[WarTypes.aux][WarConstants.rat_side] = "4aa17e70-525a-1e83-d32f-adf2f8c60daf"
+WarGuids[WarTypes.aux][WarConstants.cuman_side] = "4c4f6e9d-aa80-4f1b-a9d9-62573e6de2a7"
 
 WarLocations = {
 	--{center = { x=3087.410, y=829.085, z=118.978 }, rat = {x = 3040.93,y = 850.747,z = 119.558}, cuman = {x = 3136.570,y= 854.815,z= 122.557}},
@@ -40,10 +53,12 @@ Side = {
 
 Battle = {
 	center = nil,
+	rat_point = nil,
+	cuman_point = nil,
 	locations = nil,
 	wavesleft = WarConstants.numWaves,
-	rattayStrengthPerWave = 1, -- temp
-	cumanStrengthPerWave = 1, -- temp
+	rattayStrengthPerWave = 3, -- temp
+	cumanStrengthPerWave = 3, -- temp
 	rattayTroops = {},
 	cumanTroops = {},
 	
@@ -116,9 +131,14 @@ function WarController:ResetBattle()
 	self.currentBattle.locations = nil
 	self.inBattle = false
 	System.RemoveEntity(self.currentBattle.center.id)
+	self.currentBattle.center = nil
+	System.RemoveEntity(self.currentBattle.rat_point.id)
+	self.currentBattle.rat_point = nil	
+	System.RemoveEntity(self.currentBattle.cuman_point.id)
+	self.currentBattle.cuman_point = nil
 end
 
-function WarController:Spawn(side, position, objective)
+function WarController:Spawn(side, position, objective, troopType)
 	--System.LogAlways("$5 Attempting to Spawn troop")
 	local spawnParams = {}
 	local isEnemy = false
@@ -126,18 +146,21 @@ function WarController:Spawn(side, position, objective)
 	spawnParams.name = "soldier"
 	spawnParams.position=getrandomposnear(position, 2.0)
 	spawnParams.properties = {}
+	spawnParams.properties.sharedSoulGuid = WarGuids[troopType][side]
 	if side == WarConstants.cuman_side then
-		spawnParams.properties.sharedSoulGuid = WarConstants.cumanSoldier
 		self.currentBattle.numCuman = self.currentBattle.numCuman + 1
 		--isEnemy = true
 	else
-		spawnParams.properties.sharedSoulGuid = WarConstants.ratSoldier
 		self.currentBattle.numRattay = self.currentBattle.numRattay + 1
 	end
 	spawnParams.properties.warmodside = side
 	spawnParams.properties.bWH_PerceptibleObject = 1
 	local entity = System.SpawnEntity(spawnParams)
-	Dump(entity.soul)
+	
+	entity.soul:AddPerk(string.upper("d2da2217-d46d-4cdb-accb-4ff860a3d83e")) -- perfect block
+	entity.soul:AddPerk(string.upper("ec4c5274-50e3-4bbf-9220-823b080647c4")) -- riposte
+	entity.soul:AddPerk(string.upper("3e87c467-681d-48b5-9a8c-485443adcd42")) -- pommel strike
+	
 	local initmsg = Utils.makeTable('skirmish:init',{controller=player.this.id,isEnemy=isEnemy,oponentsNode=player.this.id,useQuickTargeting=true,targetingDistance=5.0, useMassBrain=true})
 	XGenAIModule.SendMessageToEntityData(entity.this.id,'skirmish:init',initmsg);
 	local initmsg2 = Utils.makeTable('skirmish:command',{type="attackMove",target=objective.this.id, randomRadius=0.5})
@@ -155,11 +178,15 @@ function WarController.SpawnWave(self)
 		self.currentBattle.wavesleft = self.currentBattle.wavesleft - 1
 	end
 	for i=0,self.currentBattle.cumanStrengthPerWave,1 do
-		self:Spawn(WarConstants.cuman_side, self.currentBattle.locations.cuman, self.currentBattle.center)
-	end	
-	for i=0,self.currentBattle.rattayStrengthPerWave,1 do
-		self:Spawn(WarConstants.rat_side, self.currentBattle.locations.rat, self.currentBattle.center)
+		self:Spawn(WarConstants.cuman_side, self.currentBattle.locations.cuman, self.currentBattle.rat_point, WarTypes.halberd)
 	end
+	self:Spawn(WarConstants.cuman_side, self.currentBattle.locations.cuman, self.currentBattle.rat_point, WarTypes.knight)	
+	self:Spawn(WarConstants.cuman_side, self.currentBattle.locations.cuman, self.currentBattle.rat_point, WarTypes.aux)
+	for i=0,self.currentBattle.rattayStrengthPerWave,1 do
+		self:Spawn(WarConstants.rat_side, self.currentBattle.locations.rat, self.currentBattle.cuman_point, WarTypes.halberd)
+	end
+	self:Spawn(WarConstants.rat_side, self.currentBattle.locations.rat, self.currentBattle.cuman_point, WarTypes.knight)
+	self:Spawn(WarConstants.rat_side, self.currentBattle.locations.rat, self.currentBattle.cuman_point, WarTypes.aux)
 end
 
 function WarController.RemoveCorpse(entity)
@@ -168,21 +195,28 @@ function WarController.RemoveCorpse(entity)
 	System.RemoveEntity(entity.id)
 end
 
-function WarController:GenerateBattle()
-	
+function WarController:CreateAITagPoint(location)
 	local spawnParams = {}
-	local key, value = next(WarLocationstest)
+	spawnParams.class = "Grunt"
+	spawnParams.name = "battlepoint"
+	spawnParams.position=location
+	spawnParams.properties = {}
+	spawnParams.properties.bWH_PerceptibleObject = 0
+	local entity = System.SpawnEntity(spawnParams)
+	return entity
+end
+
+function WarController:GenerateBattle()
+	local spawnParams = {}
+	local key, value = next(WarLocations)
 	local locations = value
 	message = "Our forces have met Cuman forces near " .. locations.name .. "\n"
 	message = message .. "A battle is beginning!\n"
 	Game.ShowTutorial(message, 20, false, true)
 	Dump(locations)
-	spawnParams.class = "Grunt"
-	spawnParams.name = "battlepoint"
-	spawnParams.position=locations.center
-	spawnParams.properties = {}
-	spawnParams.properties.bWH_PerceptibleObject = 0
-	self.currentBattle.center = System.SpawnEntity(spawnParams)
+	self.currentBattle.center = self:CreateAITagPoint(locations.center)
+	self.currentBattle.rat_point = self:CreateAITagPoint(locations.rat)
+	self.currentBattle.cuman_point = self:CreateAITagPoint(locations.cuman)
 	self.currentBattle.locations = locations
 	--Dump(center)
 	self.SpawnWave(self)
