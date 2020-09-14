@@ -5,10 +5,10 @@ WarConstants = {
 	troopCost = 100,
 	cumanSoldier = "4957c994-1489-f528-130c-a00b9838a4a5",
 	ratSoldier = "43b48356-ecf4-5e6e-bce4-1d98ed745baa",
-	numWaves = 4,
+	numWaves = 7,
 	corpseTime = 5000, --5 seconds
 	victoryTime = 20000, -- 30 seconds
-	waveInterval = 65000 -- 50 seconds
+	waveInterval = 75000 -- 75 seconds
 }
 
 WarTroopTypes = {
@@ -45,7 +45,7 @@ WarGuids[WarTroopTypes.aux][WarConstants.cuman_side] = "4c4f6e9d-aa80-4f1b-a9d9-
 
 WarLocations = {
 	--{center = {x = 3136.570,y= 854.815,z= 122.557}, rat = {x = 3046.669,y = 798.363,z = 115.952}, cuman = {x = 3192.020,y= 910.343,z= 127.216}, name="Rattay Farmhouse"}
-	{center = {x = 3136.570,y= 854.815,z= 122.557}, rat = {x = 2995.868,y = 809.014,z = 113.108}, cuman = {x = 3136.570,y= 854.815,z= 122.557}, name="Rattay Farmhouse"}
+	{center = {x = 3136.570,y= 854.815,z= 122.557}, rat = {x = 2995.868,y = 809.014,z = 113.108}, cuman = {x = 3136.570,y= 854.815,z= 122.557}, name="Rattay Farmhouse", resourceNode = false}
 }
 WarLocationstest = {
 	{center = { x=47.969, y=43.522, z=33.583}, rat = { x=27.969, y=43.522, z=33.583}, cuman = { x=67.969, y=43.522, z=33.583}, name="Test battleground"}
@@ -63,7 +63,7 @@ Battle = {
 	cuman_point = nil,
 	locations = nil,
 	wavesleft = WarConstants.numWaves,
-	rattayStrengthPerWave = 6, -- temp
+	rattayStrengthPerWave = 4, -- temp
 	cumanStrengthPerWave = 6, -- temp
 	rattayTroops = {},
 	cumanTroops = {},
@@ -166,6 +166,8 @@ function WarController:Spawn(side, position, objective, troopType)
 	spawnParams.properties.bWH_PerceptibleObject = 1
 	local entity = System.SpawnEntity(spawnParams)
 	
+	entity.lootable = false
+	
 	entity.soul:AddPerk(string.upper("d2da2217-d46d-4cdb-accb-4ff860a3d83e")) -- perfect block
 	entity.soul:AddPerk(string.upper("ec4c5274-50e3-4bbf-9220-823b080647c4")) -- riposte
 	entity.soul:AddPerk(string.upper("3e87c467-681d-48b5-9a8c-485443adcd42")) -- pommel strike
@@ -174,16 +176,17 @@ function WarController:Spawn(side, position, objective, troopType)
 	XGenAIModule.SendMessageToEntityData(entity.this.id,'skirmish:init',initmsg);
 	local initmsg2 = Utils.makeTable('skirmish:soundSetup',{ intensity=3.0, intensityPerEnemy=0.0, trigger="test"})
 	XGenAIModule.SendMessageToEntityData(entity.this.id,'skirmish:soundSetup',initmsg2);
+
+	local initmsg4 = Utils.makeTable('skirmish:command',{type="attackMove",target=objective.this.id, randomRadius=0.5, movementSpeed="AlertedWalk", barkTopic="q_conquest_bernard_parkan2"})
+	XGenAIModule.SendMessageToEntityData(entity.this.id,'skirmish:command',initmsg4);
 	local initmsg3 = Utils.makeTable('skirmish:barkSetup',{ topicLabel="prib_ramGate", cooldown="5s", once=false, command="*", forceSubtitles = true})
 	XGenAIModule.SendMessageToEntityData(entity.this.id,'skirmish:barkSetup',initmsg3);
-	local initmsg4 = Utils.makeTable('skirmish:command',{type="attackMove",target=objective.this.id, randomRadius=0.5, movementSpeed="AlertedWalk"})
-	XGenAIModule.SendMessageToEntityData(entity.this.id,'skirmish:command',initmsg4);
 	
 	table.insert(self.currentBattle.troops, entity)
 end
 
 -- Very specific helper function, don't use all willy nilly
-function WarController:SpawnOnlyEntity(side, position, troopType, radius)
+function WarController:SpawnSpecial(side, position, troopType, radius)
 	--System.LogAlways("$5 Attempting to Spawn troop")
 	local spawnParams = {}
 	local isEnemy = false
@@ -201,7 +204,7 @@ function WarController:SpawnOnlyEntity(side, position, troopType, radius)
 	spawnParams.properties.warmodside = side
 	spawnParams.properties.bWH_PerceptibleObject = 1
 	local entity = System.SpawnEntity(spawnParams)
-	
+	entity.lootable = false
 	entity.soul:AddPerk(string.upper("d2da2217-d46d-4cdb-accb-4ff860a3d83e")) -- perfect block
 	entity.soul:AddPerk(string.upper("ec4c5274-50e3-4bbf-9220-823b080647c4")) -- riposte
 	entity.soul:AddPerk(string.upper("3e87c467-681d-48b5-9a8c-485443adcd42")) -- pommel strike
@@ -218,13 +221,15 @@ function WarController:SpawnSquad(side, position, objective, strength)
 		self:Spawn(side, position, objective, WarTroopTypes.halberd)
 	end
 	self:Spawn(side, position,objective, WarTroopTypes.knight)
-	--self:Spawn(side, position,objective, WarTroopTypes.knight)
+	if side == WarConstants.cuman_side then
+		self:Spawn(side, position,objective, WarTroopTypes.knight)
+	end
 	self:Spawn(side, position,objective, WarTroopTypes.aux)
 end
 
 function WarController:SpawnLeader(side, position)
 	System.LogAlways("spawning leaders")
-	local leader = self:SpawnOnlyEntity(side, position, WarTroopTypes.knight, 0)
+	local leader = self:SpawnSpecial(side, position, WarTroopTypes.knight, 0)
 	if side == WarConstants.cuman_side then
 		leader.actor:EquipClothingPreset("47875046-71f3-a06f-8ec9-ea8546176b8d")
 	else
@@ -232,11 +237,17 @@ function WarController:SpawnLeader(side, position)
 	end
 	leader.soul:AdvanceToStatLevel("vit", 25)
 	leader.soul:AdvanceToStatLevel("str", 20)
-	leader.soul:SetState("health", 500)
+	leader.soul:SetState("health", 800)
 	leader.soul:OverrideHead("404f142d-dc33-769c-f121-ac7a579c7fbc")
-	local bodyguard = self:SpawnOnlyEntity(side, position, WarTroopTypes.knight, 2.0)
+	local bodyguard = self:SpawnSpecial(side, position, WarTroopTypes.knight, 2.0)
+	bodyguard.soul:AdvanceToStatLevel("vit", 25)
+	bodyguard.soul:AdvanceToStatLevel("str", 20)
+	bodyguard.soul:SetState("health", 200)
 	table.insert(self.currentBattle.troops, bodyguard)
-	local bodyguard2 = self:SpawnOnlyEntity(side, position, WarTroopTypes.knight, 2.0)
+	local bodyguard2 = self:SpawnSpecial(side, position, WarTroopTypes.knight, 2.0)
+	bodyguard2.soul:AdvanceToStatLevel("vit", 25)
+	bodyguard2.soul:AdvanceToStatLevel("str", 20)
+	bodyguard2.soul:SetState("health", 200)
 	table.insert(self.currentBattle.troops, bodyguard2)
 end
 
@@ -260,6 +271,7 @@ end
 function WarController.RemoveCorpse(entity)
 	entity:DestroyPhysics()
 	entity:Hide(1)
+	--entity:DeleteThis()
 	System.RemoveEntity(entity.id)
 end
 
@@ -278,8 +290,9 @@ function WarController:GenerateBattle()
 	local spawnParams = {}
 	local key, value = next(WarLocations)
 	local locations = value
-	message = "Our forces have met Cuman forces near " .. locations.name .. "\n"
-	message = message .. "A battle is beginning!\n"
+	message = "<font color='#FF3333' size='28'>A battle is beginning!\n\n</font>"
+	message = message .. "Our forces have met Cuman forces near " .. locations.name .. "\n\n"
+	message = message .. "Objectives:\nElimate enemy commander\nProtect your commander\nDon't lose all your men\n"
 	Game.ShowTutorial(message, 20, false, true)
 	Dump(locations)
 	self.currentBattle.center = self:CreateAITagPoint(locations.center)
@@ -313,6 +326,19 @@ function WarController:DetermineVictor()
 		Script.SetTimer(WarConstants.victoryTime, self.ClearTroops, self)
 	else
 		--not done with battle yet, so do nothing
+	end
+end
+
+function WarController:KillSide(side)
+	for key,value in pairs(self.currentBattle.troops) do
+		if value.Properties.warmodside == side then
+			if value.Properties.warmodside == WarConstants.cuman_side then
+				self.currentBattle.numCuman = self.currentBattle.numCuman - 1
+			else
+				self.currentBattle.numRattay = self.currentBattle.numRattay - 1
+			end
+			RemoveCorpse(value)
+		end
 	end
 end
 
