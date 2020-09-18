@@ -1,11 +1,10 @@
+-- Constant struct
 WarConstants = {
     cSaveLockName = "warmodsavelock",
     cMarshalName = "warmodmarshal",
     rat_side = 1,
     cuman_side = 2,
     troopCost = 100,
-    cumanSoldier = "4957c994-1489-f528-130c-a00b9838a4a5",
-    ratSoldier = "43b48356-ecf4-5e6e-bce4-1d98ed745baa",
     numWaves = 8,
     corpseTime = 5000, --5 seconds
     victoryTime = 20000, -- 30 seconds
@@ -30,9 +29,10 @@ WarTroopTypes = {
 }
 
 BattleTypes = {
-    Attack,
-    Defend,
-    Field
+    Attack = 0,
+    Defend = 1,
+    Field = 2,
+    Ambush = 3
 }
 
 WarGuids = {
@@ -52,9 +52,35 @@ WarGuids[WarTroopTypes.aux][WarConstants.rat_side] = "4aa17e70-525a-1e83-d32f-ad
 WarGuids[WarTroopTypes.aux][WarConstants.cuman_side] = "4c4f6e9d-aa80-4f1b-a9d9-62573e6de2a7"
 
 WarLocations = {
-    --{center = {x = 3136.570,y= 854.815,z= 122.557}, rat = {x = 3046.669,y = 798.363,z = 115.952}, cuman = {x = 3192.020,y= 910.343,z= 127.216}, name="Rattay Farmhouse"}
-    {center = {x = 3136.570,y= 854.815,z= 122.557}, rat = {x = 2995.868,y = 809.014,z = 113.108}, cuman = {x = 3136.570,y= 854.815,z= 122.557}, name="Rattay Farmhouse", resourceNode = false}
+    {
+        center = {x = 3136.570,y= 854.815,z= 122.557}, rat = {x = 2995.868,y = 809.014,z = 113.108}, cuman = {x = 3136.570,y= 854.815,z= 122.557}, camp = { x = 2979.425, y = 801.855, z = 110.145 },
+        name="Rattay Farmhouse",
+        resourceNode = false,
+        influence = 8,
+    },
+    {
+        center = {x = 2145.845,y= 967.7307,z= 76.2557}, rat = {x = 2242.227,y = 925.3737,z = 77.3386}, cuman = {x = 2037.570,y= 956.5421,z= 71.7819}, camp = { x = 2264.966, y = 917.7789, z = 76.3017 },
+        name="Ledetchko Encampment",
+        resourceNode = false,
+        influence = 5,
+    },
+    {
+        center = {x = 657.9334,y= 1478.049,z= 47.2376}, rat = {x = 745.2598,y = 1542.538,z = 45.724}, cuman = {x = 606.0286,y= 1462.844,z= 45.5769 }, camp = { x = 762.5239, y = 1541.537, z = 42.3058 },
+        name="Sasau Outskirts",
+        resourceNode = false,
+        influence = 9,
+    }
 }
+
+-- If your Regional Influence gets too low, enemy starts doing raids on towns and cities
+WarRaidLocations = {
+    {
+        target = { x = 20, y = 20, z = 20 },
+        start = { x = 30, y = 30, z = 20 },
+        name = "Rattay"
+    }
+}
+
 WarLocationstest = {
     {center = { x=47.969, y=43.522, z=33.583}, rat = { x=27.969, y=43.522, z=33.583}, cuman = { x=67.969, y=43.522, z=33.583}, name="Test battleground"}
 }
@@ -96,14 +122,18 @@ WarController = {
     readyForNewBattle = true,
     currentBattle = Battle,
     nextBattleLocation = nil,
+    -- in gametime
+    timeBattleStarted = 0, 
+    -- try not to repeat the same location multiple times
+    -- misnomer because its really a key
+    ignoreLocationIdx = -1,
     marshal = nil,
-    warcamp = nil
+    warcamp = nil,
+    regionalInfluence = 50,
     
 }
 
 function WarController:OnSpawn()
-    System.LogAlways("$5 I AM SPAWNED")
-
     -- needed for OnUpdate callback
     self:Activate(1)
 end
@@ -119,19 +149,29 @@ end
 
 function WarController:OnDestroy()
     self:ResetBattle()
+    
     self.ClearTroops(self)
+end
+
+function WarController:DestroyMarshal()
     if self.marshal ~= nil then
-        self.marshal:Hide(1)
-        self.marshal:DeleteThis()
-        self.warcamp:DeleteThis()
+        System.LogAlways("attempting to kill marshal")
+        self.marshal.soul:DealDamage(200,200)
+        self.marshal:DestroyPhysics();
+        System.RemoveEntity(self.marshal.id)
+        System.RemoveEntity(self.warcamp.id)
+        self.marshal = nil
+        self.warcamp = nil
     end
-    System.LogAlways("$5 I AM DELETE")
 end
 
 function WarController:OnSave(table)
     --this should be easy because all troops and entities should be cleared before any save action
     table.marshal = self.marshal:GetGUID()
     table.warcamp = self.warcamp:GetGUID()
+    -- reuse this to index on load due to table shallow copy issues
+    table.ignoreLocationIdx = self.ignoreLocationIdx
+    table.regionalInfluence = self.regionalInfluence
 end
 
 function WarController:OnLoad(table)
@@ -139,9 +179,12 @@ function WarController:OnLoad(table)
     self.warcamp = System.GetEntityByGUID(table.warcamp)
     if self.warcamp ~= nil then
         self.warcamp:LoadObject(0, WarConstants.campMesh)
-        self.warcamp = nil
     end
-
+    
+    self.ignoreLocationIdx = table.ignoreLocationIdx
+    self.nextBattleLocation = WarLocations[self.ignoreLocationIdx]
+    self.regionalInfluence = table.regionalInfluence
+    
     self.needReload = true
 end
 
@@ -158,6 +201,7 @@ function getrandomposnear(position, radius)
     return ret
 end
 
+-- This should only be called at the end of a battle, so we can safely reset here
 function WarController.ClearTroops(self)
     if self.currentBattle.ratCommander ~= nil then
         self.RemoveCorpse(self.currentBattle.ratCommander)
@@ -168,17 +212,20 @@ function WarController.ClearTroops(self)
         self.currentBattle.cumanCommander = nil
     end
     for key,value in pairs(self.currentBattle.troops) do
-        self.RemoveCorpse(self.currentBattle.troops[key])
+        self.RemoveCorpse(value)
         self.currentBattle.troops[key] = nil
     end
     self.readyForNewBattle = true
+    self.nextBattleLocation = nil
     Game.RemoveSaveLock(WarConstants.cSaveLockName)
 end
 
+-- should be called alongside cleartroops
 function WarController:ResetBattle()
     self.currentBattle.wavesleft = WarConstants.numWaves
     self.currentBattle.locations = nil
     self.inBattle = false
+    
     if self.currentBattle.center ~= nil then
         System.RemoveEntity(self.currentBattle.center.id)
         self.currentBattle.center = nil
@@ -200,6 +247,8 @@ function WarController:ResetBattle()
     self.currentBattle.numRattay = 0
 end
 
+-- Spawn function spawns an entity and then adds that entity to current troop
+-- Nomenclature conflicts with SpawnSpecial so this should be renamed
 function WarController:Spawn(side, position, objective, troopType)
     --System.LogAlways("$5 Attempting to Spawn troop")
     local spawnParams = {}
@@ -212,7 +261,6 @@ function WarController:Spawn(side, position, objective, troopType)
     if side == WarConstants.cuman_side then
         self.currentBattle.numCuman = self.currentBattle.numCuman + 1
         isEnemy = true
-        
     else
         self.currentBattle.numRattay = self.currentBattle.numRattay + 1
     end
@@ -232,18 +280,20 @@ function WarController:Spawn(side, position, objective, troopType)
     
     local initmsg = Utils.makeTable('skirmish:init',{controller=player.this.id,isEnemy=isEnemy,oponentsNode=player.this.id,useQuickTargeting=true,targetingDistance=5.0, useMassBrain=true})
     XGenAIModule.SendMessageToEntityData(entity.this.id,'skirmish:init',initmsg);
-    local initmsg2 = Utils.makeTable('skirmish:soundSetup',{ intensity=3.0, intensityPerEnemy=0.0, trigger="test"})
-    XGenAIModule.SendMessageToEntityData(entity.this.id,'skirmish:soundSetup',initmsg2);
+    local initmsg2 = Utils.makeTable('skirmish:soundSetup',{ intensity=1.0, intensityPerEnemy=-0.5})
+    --XGenAIModule.SendMessageToEntityData(entity.this.id,'skirmish:soundSetup',initmsg2);
 
     local initmsg4 = Utils.makeTable('skirmish:command',{type="attackMove",target=objective.this.id, randomRadius=0.5, movementSpeed="AlertedWalk", barkTopic="q_conquest_bernard_parkan2"})
     XGenAIModule.SendMessageToEntityData(entity.this.id,'skirmish:command',initmsg4);
-    local initmsg3 = Utils.makeTable('skirmish:barkSetup',{ topicLabel="prib_ramGate", cooldown="5s", once=false, command="*", forceSubtitles = true})
+    local initmsg3 = Utils.makeTable('skirmish:barkSetup',{ topicLabel="q_defence_soldier", cooldown="5s", once=false, command="*", forceSubtitles = false})
     XGenAIModule.SendMessageToEntityData(entity.this.id,'skirmish:barkSetup',initmsg3);
     
     table.insert(self.currentBattle.troops, entity)
 end
 
 -- Very specific helper function, don't use all willy nilly
+-- Returns the entity and does not add it to the list of troops
+-- actually there is a lot of shared code so this needs refactoring
 function WarController:SpawnSpecial(side, position, troopType, radius)
     --System.LogAlways("$5 Attempting to Spawn troop")
     local spawnParams = {}
@@ -279,6 +329,7 @@ function WarController:SpawnSquad(side, position, objective, strength)
         self:Spawn(side, position, objective, WarTroopTypes.halberd)
     end
     self:Spawn(side, position,objective, WarTroopTypes.knight)
+    -- Cumans get another knight because the rattay get the player, the ultimate knight
     if side == WarConstants.cuman_side then
         self:Spawn(side, position,objective, WarTroopTypes.knight)
     end
@@ -335,7 +386,7 @@ end
 
 function WarController.RemoveCorpse(entity)
     entity:DestroyPhysics()
-    entity:Hide(1)
+    entity:Hide(1) 
     --entity:DeleteThis()
     System.RemoveEntity(entity.id)
 end
@@ -352,10 +403,10 @@ function WarController:CreateAITagPoint(location)
 end
 
 function WarController:GenerateBattle()
-    if self.inBattle == false and self.readyForNewBattle == true then
+    if self.inBattle == false and self.readyForNewBattle == true and self.nextBattleLocation ~= nil then
+        QuestSystem.CompleteObjective("quest_warmod", "startBattle")
         local spawnParams = {}
-        local key, value = next(WarLocations)
-        local locations = value
+        local locations = self.nextBattleLocation
         message = "<font color='#FF3333' size='28'>A battle is beginning!\n\n</font>"
         message = message .. "Our forces have met Cuman forces near " .. locations.name .. "\n\n"
         message = message .. "Objectives:\nElimate enemy commander\nProtect your commander\nDon't lose all your men\n"
@@ -368,11 +419,14 @@ function WarController:GenerateBattle()
         --Dump(center)
         self.inBattle = true
         self.readyForNewBattle = false
+        self.timeBattleStarted = Calendar.GetWorldTime()
         Utils.DisableSave(WarConstants.cSaveLockName, enum_disableSaveReason.battle)
         
         self.SpawnWave(self)
         self:SpawnLeader(WarConstants.cuman_side, self.currentBattle.locations.cuman)
         self:SpawnLeader(WarConstants.rat_side, self.currentBattle.locations.rat)
+    else
+        System.LogAlways("tried to create battle but state does not allow it")
     end
 end
 
@@ -388,23 +442,22 @@ function WarController:AssignActions(entity)
     end
 end
 
-function WarController:CreateMarshal()
+function WarController:CreateMarshal(position)
     if self.marshal == nil then
         local spawnParams = {}
         spawnParams.class = "NPC"
         spawnParams.orientation = { x = 0, y = 0, z = 0 }
-        --local vec = { x = 2986.043, y = 791.058, z = 111.972 }
-        local vec = { x = 2979.425, y = 801.855, z = 111.145 }
-        spawnParams.position = vec
+        --local vec = { x = 2979.425, y = 801.855, z = 111.145 }
+        spawnParams.position = position
         spawnParams.properties = {}
         spawnParams.properties.sharedSoulGuid = "4861066f-1843-2ba9-42d5-05a5e34303ae"
         spawnParams.name = self.cMarshalName
         local entity = System.SpawnEntity(spawnParams)
         entity.lootable = false
+        entity.AI.invulnerable = true
         self.marshal = entity
-        --"Objects/props/furniture/tables/table_castle/table_10.cgf",
         System.LogAlways("$5 Created Marshal")
-        self:CreateWarCamp(vec)
+        self:CreateWarCamp(position)
         self:AssignActions(entity)
         self:AssignQuest()
     end
@@ -414,10 +467,10 @@ function WarController:CreateWarCamp(position)
     local spawnParams = {}
     spawnParams.class = "BasicEntity"
     spawnParams.orientation = { x = 0, y = 0, z = 0 }
-    local vec = position
-    vec.x = vec.x + 0.1
-    vec.y = vec.y + 0.1
-    vec.z = vec.z - 1.2
+    local vec = {}
+    vec.x = position.x + 0.1
+    vec.y = position.y + 0.1
+    vec.z = position.z
     spawnParams.name = "warcamp"
     spawnParams.position = vec
     spawnParams.properties = {}
@@ -428,6 +481,7 @@ function WarController:CreateWarCamp(position)
 end
 
 function WarController:AssignQuest()
+    QuestSystem.ResetQuest("quest_warmod")
     QuestSystem.ActivateQuest("quest_warmod")
     if not QuestSystem.IsQuestStarted("quest_warmod") then
         QuestSystem.StartQuest("quest_warmod")
@@ -435,21 +489,30 @@ function WarController:AssignQuest()
     end
 end
 
+-- Reset objective and issue rewards
 function WarController:Debrief(won)
+    QuestSystem.CompleteObjective("quest_warmod", "finishBattle")
+    self:DestroyMarshal()
     if won == true then
         local base = WarRewards.base
         base = base + (self.currentBattle.wavesleft * WarRewards.perWave)
         base = base + (self.currentBattle.kills * WarRewards.perKill)
-        
+        self.regionalInfluence = self.regionalInfluence + self.currentBattle.locations.influence
         message = "<font color='#111111' size='24'>You won!\n\n</font>"
         message = message .. "<font color='#FF3333' size='20'>Rewards:\n\n</font>"
         message = message .. "You received "
-        message = message .. base .. " Groschen"
+        message = message .. base .. " Groschen\n\n"
+        message = message .. "You gained " .. self.currentBattle.locations.influence .. " Regional Influence\n"
+        message = message .. "Current Regional Influence: " .. self.regionalInfluence
         Game.ShowTutorial(message, 20, false, true)
-        AddMoneyToInventory(player,base)
+        -- ingame functions allow for fractions of groschen
+        AddMoneyToInventory(player,base * 10)
     else
+        self.regionalInfluence = self.regionalInfluence - self.currentBattle.locations.influence
         message = "<font color='#111111' size='24'>You lost!\n\n</font>"
-        message = message .. "The cumans have taken this location"
+        message = message .. "The Cumans have taken this location\n\n"
+        message = message .. "You lost " .. self.currentBattle.locations.influence .. " Regional Influence\n"
+        message = message .. "Current Regional Influence: " .. self.regionalInfluence
         Game.ShowTutorial(message, 20, false, true)
     end
 end
@@ -478,11 +541,10 @@ function WarController:DetermineVictor()
     if self.currentBattle.wavesleft == 0 then
         if self.currentBattle.numRattay == 0 then
             Game.SendInfoText("All Bohemian troops have died! The battle was a defeat!",false,nil,10)
+            self:Debrief(true)
             self:ResetBattle()
             --they get time for victory
             Script.SetTimer(WarConstants.victoryTime, self.ClearTroops, self)
-        else
-            --not done with battle yet, so do nothing
         end
     end
 end
@@ -521,6 +583,32 @@ function WarController:CheckDeaths()
 end
 
 function WarController:ReadyForBattle()
+    -- lua is really fucking annoying because there are only hash tables
+    -- we are not guaranteed that a key may be numeric
+    if self.inBattle == false and self.readyForNewBattle == true then
+        local keyset = {}
+        for k in pairs(WarLocations) do
+            table.insert(keyset, k)
+        end
+        local idx = math.random(#keyset)
+        
+        -- only ignore if we have more than 1 location
+        if #keyset > 1 then
+            -- try not to repeat same battle twice
+            while idx == self.ignoreLocationIdx do
+                idx = math.random(#keyset)
+            end
+        end
+        
+        local location = WarLocations[keyset[idx]]
+        self.ignoreLocationIdx = idx
+        message = "The War Marshal sends you word. Troops are gathering for a battle at "
+        message = message .. location.name .. " and would like your help"
+        Game.SendInfoText(message,false,nil,20)
+        
+        self.nextBattleLocation = location
+        self:CreateMarshal(location.camp)
+    end
 end
 
 function WarController:OffScreenBattle()
@@ -542,8 +630,9 @@ function WarController:OnUpdate(delta)
             --generate battles and do general war AI things
             local position = player:GetWorldPos()
             if self.marshal == nil then
-                self:CreateMarshal()
+                self:ReadyForBattle()
             else
+                -- just chillin
             end
         end
     end
