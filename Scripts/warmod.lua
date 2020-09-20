@@ -1,56 +1,43 @@
 War_Mod = {
-	cUniqueIdName="warmarshallidname",
-	currController = nil
+    cUniqueIdName="warcontrolleridunique",
+    currController = nil
 }
 
-function War_Mod.AssignActions(entity)
-	entity.GetActions = function (user,firstFast)
-		output = {}
-		AddInteractorAction( output, firstFast, Action():hint("Start Battle"):action("use"):hintType( AHT_HOLD ):func(entity.OnUsed):interaction(inr_talk))
-		return output
-	end
-	entity.OnUsed = function (self, user)
-		War_Mod.create()
-		War_Mod.startwar()
-	end
-end
-
-
 function War_Mod.FG_Init()
-	local entity = System.GetEntityByName(War_Mod.cUniqueIdName) 
-	War_Mod.quest()
-	System.LogAlways("$5 Started WarMod")
+    allcontrollers = System.GetEntitiesByClass("WarController")
+    local key, value = next(allcontrollers)
+    local entity = value
+    if entity == nil then
+        War_Mod.create()
+    else
+        System.LogAlways("Found existing warcontroller")
+        War_Mod.currController = entity
+    end
+    System.LogAlways("$5 Started WarMod")
 end
 
-function War_Mod.startwar()
-	War_Mod.currController:GenerateBattle()
+function War_Mod.endearly()
+    War_Mod.currController.currentBattle.cumanCommander.soul:DealDamage(200,200)
 end
 
-function War_Mod.createtable()
-	--"Objects/props/furniture/tables/table_castle/table_10.cgf",
-end
-
-function War_Mod.quest()
+function War_Mod.testbow()
     local spawnParams = {}
     spawnParams.class = "NPC"
-    spawnParams.orientation = { x = 0, y = 0, z = 1 }
-	spawnParams.position = { x = 2986.043, y = 791.058, z = 111.972 }
+    spawnParams.orientation = { x = 0, y = 0, z = 0 }
+    --local vec = { x = 2979.425, y = 801.855, z = 111.145 }
+    spawnParams.position = player:GetWorldPos()
     spawnParams.properties = {}
-	spawnParams.properties.sharedSoulGuid = "4861066f-1843-2ba9-42d5-05a5e34303ae"
-	--spawnParams.properties.sharedSoulGuid = "4a34c4de-21f9-a475-80dc-70b0dcfa7fa6"
-    spawnParams.name = War_Mod.cUniqueIdName
+    spawnParams.properties.sharedSoulGuid = "822cfefc-4d92-4fa4-824a-f772b511eeca"
     local entity = System.SpawnEntity(spawnParams)
-	entity.lootable = false
-	War_Mod.AssignActions(entity)
-	--"Objects/props/furniture/tables/table_castle/table_10.cgf",
-	System.LogAlways("$5 Created Marshal")
-	
-	QuestSystem.ActivateQuest("quest_warmod")
-	if not QuestSystem.IsQuestStarted("quest_warmod") then
-		QuestSystem.StartQuest("quest_warmod")
-		QuestSystem.StartObjective("quest_warmod", "startBattle", false)
-	end
+        local initmsg = Utils.makeTable('skirmish:init',{controller=player.this.id,isEnemy=true,oponentsNode=player.this.id,useQuickTargeting=true,targetingDistance=5.0, useMassBrain=true})
+    XGenAIModule.SendMessageToEntityData(entity.this.id,'skirmish:init',initmsg);
+end
 
+function War_Mod.uninstall()
+    local entities = System.GetEntitiesByClass("WarController")
+    for key, value in pairs(entities) do
+        System.RemoveEntity(value.id)
+    end
 end
 
 function War_Mod.create()
@@ -58,11 +45,13 @@ function War_Mod.create()
     spawnParams.class = "WarController"
     spawnParams.orientation = { x = 0, y = 0, z = 1 }
     spawnParams.properties = {}
-    spawnParams.name = "warcontroller"
+    spawnParams.name = War_Mod.cUniqueIdName
     local entity = System.SpawnEntity(spawnParams)
     System.LogAlways("$5 [WarController] has been successfully created.")
     War_Mod.currController = entity
 end
-System.AddCCommand("quest", "War_Mod.quest()", "[Debug] test follower")
+
+System.AddCCommand("warmodbow", "War_Mod.testbow()", "[Debug] test follower")
+System.AddCCommand("warmod_uninstall", "War_Mod.uninstall()", "[Debug] test follower")
 System.AddCCommand("warmod", "War_Mod.create()", "[Debug] test follower")
-System.AddCCommand("startwar", "War_Mod.startwar()", "[Debug] test follower")
+System.AddCCommand("warmod_kill", "War_Mod.endearly()", "[Debug] test follower")

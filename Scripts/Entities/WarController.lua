@@ -1,137 +1,4 @@
--- Constant struct
-WarConstants = {
-    cSaveLockName = "warmodsavelock",
-    cMarshalName = "warmodmarshal",
-    rat_side = 1,
-    cuman_side = 2,
-    troopCost = 100,
-    numWaves = 8,
-    corpseTime = 5000, --5 seconds
-    victoryTime = 20000, -- 30 seconds
-    waveInterval = 75000, -- 75 seconds
-    campMesh = "objects/structures/tent_cuman/tent_cuman_v6_b.cgf"
-}
 
-WarRewards = {
-    base = 250,
-    perWave = 150,
-    perKill = 4,
-}
-
-WarTroopTypes = {
-    commander = 0,
-    knight = 1,
-    halberd = 2,
-    aux = 3,
-    bow = 4,
-    halberd_light = 5,
-    aux_light = 6
-}
-
-BattleTypes = {
-    Attack = 0,
-    Defend = 1,
-    Field = 2,
-    Ambush = 3
-}
-
-WarGuids = {
-    knight = {},
-    halberd = {},
-    aux = {}
-}
-
-WarGuids[WarTroopTypes.knight] = {}
-WarGuids[WarTroopTypes.knight][WarConstants.rat_side] = "41429725-5368-3cb1-6440-2e2e02b4fc97"
-WarGuids[WarTroopTypes.knight][WarConstants.cuman_side] = "49c00005-e5e9-ee50-7370-8bc12c8ad29f"
-WarGuids[WarTroopTypes.halberd] = {}
-WarGuids[WarTroopTypes.halberd][WarConstants.rat_side] = "43b48356-ecf4-5e6e-bce4-1d98ed745baa"
-WarGuids[WarTroopTypes.halberd][WarConstants.cuman_side] = "4957c994-1489-f528-130c-a00b9838a4a5"
-WarGuids[WarTroopTypes.aux] = {}
-WarGuids[WarTroopTypes.aux][WarConstants.rat_side] = "4aa17e70-525a-1e83-d32f-adf2f8c60daf"
-WarGuids[WarTroopTypes.aux][WarConstants.cuman_side] = "4c4f6e9d-aa80-4f1b-a9d9-62573e6de2a7"
-
-WarLocations = {
-    {
-        center = {x = 3136.570,y= 854.815,z= 122.557}, rat = {x = 2995.868,y = 809.014,z = 113.108}, cuman = {x = 3136.570,y= 854.815,z= 122.557}, camp = { x = 2979.425, y = 801.855, z = 110.145 },
-        name="Rattay Farmhouse",
-        resourceNode = false,
-        influence = 8,
-    },
-    {
-        center = {x = 2145.845,y= 967.7307,z= 76.2557}, rat = {x = 2242.227,y = 925.3737,z = 77.3386}, cuman = {x = 2037.570,y= 956.5421,z= 71.7819}, camp = { x = 2264.966, y = 917.7789, z = 76.3017 },
-        name="Ledetchko Encampment",
-        resourceNode = false,
-        influence = 5,
-    },
-    {
-        center = {x = 657.9334,y= 1478.049,z= 47.2376}, rat = {x = 745.2598,y = 1542.538,z = 45.724}, cuman = {x = 606.0286,y= 1462.844,z= 45.5769 }, camp = { x = 762.5239, y = 1541.537, z = 42.3058 },
-        name="Sasau Outskirts",
-        resourceNode = false,
-        influence = 9,
-    }
-}
-
--- If your Regional Influence gets too low, enemy starts doing raids on towns and cities
-WarRaidLocations = {
-    {
-        target = { x = 20, y = 20, z = 20 },
-        start = { x = 30, y = 30, z = 20 },
-        name = "Rattay"
-    }
-}
-
-WarLocationstest = {
-    {center = { x=47.969, y=43.522, z=33.583}, rat = { x=27.969, y=43.522, z=33.583}, cuman = { x=67.969, y=43.522, z=33.583}, name="Test battleground"}
-}
-
-Side = {
-    strength = 500,
-    money = 100000,
-    controlledLocations = {}
-}
-
-Battle = {
-    center = nil,
-    rat_point = nil,
-    cuman_point = nil,
-    locations = nil,
-    
-    wavesleft = WarConstants.numWaves,
-    rattayStrengthPerWave = 4, -- temp
-    cumanStrengthPerWave = 6, -- temp
-    rattayTroops = {},
-    cumanTroops = {},
-    
-    troops = {},
-    numCuman = 0,
-    numRattay = 0,
-    
-    kills = 0,
-    
-    ratCommander = nil,
-    cumanCommander = nil
-}
-
-WarController = {
-    Rattay = Side,
-    Cuman = Side,
-    needReload = false,
-    -- only 1 battle can occur at a time
-    inBattle = false,
-    readyForNewBattle = true,
-    currentBattle = Battle,
-    nextBattleLocation = nil,
-    -- in gametime
-    timeBattleStarted = 0, 
-    -- try not to repeat the same location multiple times
-    -- misnomer because its really a key
-    ignoreLocationIdx = -1,
-    marshal = nil,
-    warcamp = nil,
-    regionalInfluence = 50,
-    
-}
 
 function WarController:OnSpawn()
     -- needed for OnUpdate callback
@@ -158,10 +25,17 @@ function WarController:DestroyMarshal()
         System.LogAlways("attempting to kill marshal")
         self.marshal.soul:DealDamage(200,200)
         self.marshal:DestroyPhysics();
+        
         System.RemoveEntity(self.marshal.id)
         System.RemoveEntity(self.warcamp.id)
         self.marshal = nil
         self.warcamp = nil
+    end
+    if self.logiOfficer ~= nil then
+        self.logiOfficer.soul:DealDamage(200,200)
+        self.logiOfficer:DestroyPhysics();
+        System.RemoveEntity(self.logiOfficer.id)
+        self.logiOfficer = nil
     end
 end
 
@@ -169,14 +43,20 @@ function WarController:OnSave(table)
     --this should be easy because all troops and entities should be cleared before any save action
     table.marshal = self.marshal:GetGUID()
     table.warcamp = self.warcamp:GetGUID()
+    table.logiOfficer = self.logiOfficer:GetGUID()
     -- reuse this to index on load due to table shallow copy issues
     table.ignoreLocationIdx = self.ignoreLocationIdx
     table.regionalInfluence = self.regionalInfluence
+    
+    table.currentBattle = {}
+    table.currentBattle.wavesleft = self.currentBattle.wavesleft
+    
 end
 
 function WarController:OnLoad(table)
     self.marshal = System.GetEntityByGUID(table.marshal)
     self.warcamp = System.GetEntityByGUID(table.warcamp)
+    self.logiOfficer = System.GetEntityByGUID(table.logiOfficer)
     if self.warcamp ~= nil then
         self.warcamp:LoadObject(0, WarConstants.campMesh)
     end
@@ -241,7 +121,7 @@ function WarController:ResetBattle()
         self.currentBattle.cuman_point = nil
     end
     
-
+    Utils.DeepCopyTable(WarStrengthPerWave, self.currentBattle.strengthPerWave)
     self.currentBattle.kills = 0
     self.currentBattle.numCuman = 0
     self.currentBattle.numRattay = 0
@@ -280,13 +160,13 @@ function WarController:Spawn(side, position, objective, troopType)
     
     local initmsg = Utils.makeTable('skirmish:init',{controller=player.this.id,isEnemy=isEnemy,oponentsNode=player.this.id,useQuickTargeting=true,targetingDistance=5.0, useMassBrain=true})
     XGenAIModule.SendMessageToEntityData(entity.this.id,'skirmish:init',initmsg);
-    local initmsg2 = Utils.makeTable('skirmish:soundSetup',{ intensity=1.0, intensityPerEnemy=-0.5})
+    local initmsg2 = Utils.makeTable('skirmish:soundSetup',{ intensity=1.0, intensityPerEnemy=0.2, trigger="battle_ambient"})
     --XGenAIModule.SendMessageToEntityData(entity.this.id,'skirmish:soundSetup',initmsg2);
 
-    local initmsg4 = Utils.makeTable('skirmish:command',{type="attackMove",target=objective.this.id, randomRadius=0.5, movementSpeed="AlertedWalk", barkTopic="q_conquest_bernard_parkan2"})
+    local initmsg4 = Utils.makeTable('skirmish:command',{type="attackMove",target=objective.this.id, randomRadius=0.5, movementSpeed="AlertedWalk"})
     XGenAIModule.SendMessageToEntityData(entity.this.id,'skirmish:command',initmsg4);
-    local initmsg3 = Utils.makeTable('skirmish:barkSetup',{ topicLabel="q_defence_soldier", cooldown="5s", once=false, command="*", forceSubtitles = false})
-    XGenAIModule.SendMessageToEntityData(entity.this.id,'skirmish:barkSetup',initmsg3);
+    local initmsg3 = Utils.makeTable('skirmish:barkSetup',{ metarole="COMBAT_CHARGE", cooldown="15s", once=false, command="*", forceSubtitles = false})
+    XGenAIModule.SendMessageToEntityData(entity.this.id,'skirmish:barkSetup',initmsg3)
     
     table.insert(self.currentBattle.troops, entity)
 end
@@ -323,17 +203,24 @@ function WarController:SpawnSpecial(side, position, troopType, radius)
     return entity
 end
 
-function WarController:SpawnSquad(side, position, objective, strength)
+function WarController:SpawnSquad(side, position, objective)
     local num = 0
-    for i=0,strength,1 do
+    local strengthFuzz = self.currentBattle.strengthPerWave[WarTroopTypes.halberd][side]
+    -- fuzz halberd strength because they are the meat and potatoes of a squad
+    strengthFuzz = strengthFuzz + math.random(0, WarConstants.squadNumberVariance) - math.random(0,WarConstants.squadNumberVariance)
+    for i=0,strengthFuzz,1 do
         self:Spawn(side, position, objective, WarTroopTypes.halberd)
     end
-    self:Spawn(side, position,objective, WarTroopTypes.knight)
-    -- Cumans get another knight because the rattay get the player, the ultimate knight
-    if side == WarConstants.cuman_side then
-        self:Spawn(side, position,objective, WarTroopTypes.knight)
+    
+    for i=0,self.currentBattle.strengthPerWave[WarTroopTypes.knight][side],1 do
+        self:Spawn(side, position, objective, WarTroopTypes.knight)
     end
-    self:Spawn(side, position,objective, WarTroopTypes.aux)
+    for i=0,self.currentBattle.strengthPerWave[WarTroopTypes.aux][side],1 do
+        self:Spawn(side, position,objective, WarTroopTypes.aux)
+    end    
+    for i=0,self.currentBattle.strengthPerWave[WarTroopTypes.bow][side],1 do
+        self:Spawn(side, position,objective, WarTroopTypes.bow)
+    end
 end
 
 function WarController:SpawnLeader(side, position)
@@ -380,8 +267,8 @@ function WarController.SpawnWave(self)
         self.currentBattle.wavesleft = self.currentBattle.wavesleft - 1
     end
     
-    self:SpawnSquad(WarConstants.cuman_side, self.currentBattle.locations.cuman, self.currentBattle.rat_point, self.currentBattle.cumanStrengthPerWave)
-    self:SpawnSquad(WarConstants.rat_side, self.currentBattle.locations.rat, self.currentBattle.cuman_point, self.currentBattle.rattayStrengthPerWave)
+    self:SpawnSquad(WarConstants.cuman_side, self.currentBattle.locations.cuman, self.currentBattle.rat_point)
+    self:SpawnSquad(WarConstants.rat_side, self.currentBattle.locations.rat, self.currentBattle.cuman_point)
 end
 
 function WarController.RemoveCorpse(entity)
@@ -430,55 +317,6 @@ function WarController:GenerateBattle()
     end
 end
 
-function WarController:AssignActions(entity)
-    entity.GetActions = function (user,firstFast)
-        output = {}
-        AddInteractorAction( output, firstFast, Action():hint("Start Battle"):action("use"):hintType( AHT_HOLD ):func(entity.OnUsed):interaction(inr_talk))
-        return output
-    end
-    entity.Properties.controller = self
-    entity.OnUsed = function (self, user)
-        self.Properties.controller:GenerateBattle()
-    end
-end
-
-function WarController:CreateMarshal(position)
-    if self.marshal == nil then
-        local spawnParams = {}
-        spawnParams.class = "NPC"
-        spawnParams.orientation = { x = 0, y = 0, z = 0 }
-        --local vec = { x = 2979.425, y = 801.855, z = 111.145 }
-        spawnParams.position = position
-        spawnParams.properties = {}
-        spawnParams.properties.sharedSoulGuid = "4861066f-1843-2ba9-42d5-05a5e34303ae"
-        spawnParams.name = self.cMarshalName
-        local entity = System.SpawnEntity(spawnParams)
-        entity.lootable = false
-        entity.AI.invulnerable = true
-        self.marshal = entity
-        System.LogAlways("$5 Created Marshal")
-        self:CreateWarCamp(position)
-        self:AssignActions(entity)
-        self:AssignQuest()
-    end
-end
-
-function WarController:CreateWarCamp(position)
-    local spawnParams = {}
-    spawnParams.class = "BasicEntity"
-    spawnParams.orientation = { x = 0, y = 0, z = 0 }
-    local vec = {}
-    vec.x = position.x + 0.1
-    vec.y = position.y + 0.1
-    vec.z = position.z
-    spawnParams.name = "warcamp"
-    spawnParams.position = vec
-    spawnParams.properties = {}
-    local modelPath = WarConstants.campMesh
-    spawnParams.properties.object_Model = modelPath
-    local entity = System.SpawnEntity(spawnParams)
-    self.warcamp = entity
-end
 
 function WarController:AssignQuest()
     QuestSystem.ResetQuest("quest_warmod")
@@ -492,29 +330,43 @@ end
 -- Reset objective and issue rewards
 function WarController:Debrief(won)
     QuestSystem.CompleteObjective("quest_warmod", "finishBattle")
+    local influence = self.currentBattle.locations.influence + math.random(0,3) - math.random(0,3)
+    
     self:DestroyMarshal()
     if won == true then
         local base = WarRewards.base
         base = base + (self.currentBattle.wavesleft * WarRewards.perWave)
         base = base + (self.currentBattle.kills * WarRewards.perKill)
-        self.regionalInfluence = self.regionalInfluence + self.currentBattle.locations.influence
+        self.regionalInfluence = self.regionalInfluence + influence
         message = "<font color='#111111' size='24'>You won!\n\n</font>"
         message = message .. "<font color='#FF3333' size='20'>Rewards:\n\n</font>"
         message = message .. "You received "
         message = message .. base .. " Groschen\n\n"
-        message = message .. "You gained " .. self.currentBattle.locations.influence .. " Regional Influence\n"
+        message = message .. "You gained " .. influence .. " Regional Influence\n"
         message = message .. "Current Regional Influence: " .. self.regionalInfluence
         Game.ShowTutorial(message, 20, false, true)
         -- ingame functions allow for fractions of groschen
         AddMoneyToInventory(player,base * 10)
     else
-        self.regionalInfluence = self.regionalInfluence - self.currentBattle.locations.influence
+        self.regionalInfluence = self.regionalInfluence - influence
         message = "<font color='#111111' size='24'>You lost!\n\n</font>"
         message = message .. "The Cumans have taken this location\n\n"
-        message = message .. "You lost " .. self.currentBattle.locations.influence .. " Regional Influence\n"
+        message = message .. "You lost " .. influence .. " Regional Influence\n"
         message = message .. "Current Regional Influence: " .. self.regionalInfluence
         Game.ShowTutorial(message, 20, false, true)
     end
+end
+
+function WarController:Brief()
+        message = "<font color='#333333' size='28'>Briefing\n\n</font>"
+        message = message .. "Current Regional Influence: " .. self.regionalInfluence .. "\n\n"
+        message = message .. "Bohemian Knights: " .. self.currentBattle.strengthPerWave[WarTroopTypes.knight][WarConstants.rat_side] .. "\n"
+        message = message .. "Bohemian Halberdiers: " .. self.currentBattle.strengthPerWave[WarTroopTypes.halberd][WarConstants.rat_side] .. "\n"
+        message = message .. "Bohemian Auxiliaries: " .. self.currentBattle.strengthPerWave[WarTroopTypes.aux][WarConstants.rat_side] .. "\n"
+        message = message .. "Bohemian Archers: " .. self.currentBattle.strengthPerWave[WarTroopTypes.bow][WarConstants.rat_side] .. "\n\n"
+        message = message .. "Cuman Strength: Medium\n\n"
+        message = message .. "Available Reinforcement Waves: " .. self.currentBattle.wavesleft
+        Game.ShowTutorial(message, 20, false, true)
 end
 
 function WarController:DetermineVictor()
@@ -582,12 +434,23 @@ function WarController:CheckDeaths()
     end
 end
 
+function WarController:DetermineDifficulty()
+    if self.regionalInfluence > WarDifficulty.hard then
+    
+    elseif self.regionalInfluence > WarDifficulty.hard then
+    elseif self.regionalInfluence > WarDifficulty.medium then
+    
+    else
+    end
+end
+
+-- Determines battle setup, as well as difficulty
 function WarController:ReadyForBattle()
     -- lua is really fucking annoying because there are only hash tables
     -- we are not guaranteed that a key may be numeric
     if self.inBattle == false and self.readyForNewBattle == true then
         local keyset = {}
-        for k in pairs(WarLocations) do
+        for k in pairs(WarLocationstest) do
             table.insert(keyset, k)
         end
         local idx = math.random(#keyset)
@@ -600,12 +463,13 @@ function WarController:ReadyForBattle()
             end
         end
         
-        local location = WarLocations[keyset[idx]]
+        local location = WarLocationstest[keyset[idx]]
         self.ignoreLocationIdx = idx
         message = "The War Marshal sends you word. Troops are gathering for a battle at "
         message = message .. location.name .. " and would like your help"
         Game.SendInfoText(message,false,nil,20)
-        
+        -- reset strengths
+        Utils.DeepCopyTable(WarStrengthPerWave, self.currentBattle.strengthPerWave)
         self.nextBattleLocation = location
         self:CreateMarshal(location.camp)
     end
@@ -620,6 +484,10 @@ function WarController:OnUpdate(delta)
             self:AssignActions(self.marshal)
             self.marshal:SetViewDistUnlimited()
             self.warcamp:SetViewDistUnlimited()
+        end
+        if self.logiOfficer ~= nil then
+            self:AssignActionsLogiOfficer(self.logiOfficer)
+            self.logiOfficer:SetViewDistUnlimited()
         end
         self.needReload = false
     else
