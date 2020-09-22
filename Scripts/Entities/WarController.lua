@@ -18,6 +18,7 @@ function WarController:OnDestroy()
     self:ResetBattle()
     
     self.ClearTroops(self)
+    self:DestroyMarshal()
 end
 
 function WarController:DestroyMarshal()
@@ -50,7 +51,8 @@ function WarController:OnSave(table)
     
     table.currentBattle = {}
     table.currentBattle.wavesleft = self.currentBattle.wavesleft
-    
+    table.currentBattle.strengthPerWave = {}
+    Utils.DeepCopyTable(self.currentBattle.strengthPerWave, table.currentBattle.strengthPerWave)
 end
 
 function WarController:OnLoad(table)
@@ -64,6 +66,10 @@ function WarController:OnLoad(table)
     self.ignoreLocationIdx = table.ignoreLocationIdx
     self.nextBattleLocation = WarLocations[self.ignoreLocationIdx]
     self.regionalInfluence = table.regionalInfluence
+    if table.currentBattle ~= nil then
+        self.currentBattle.wavesleft = table.currentBattle.wavesleft
+        Utils.DeepCopyTable(table.currentBattle.strengthPerWave, self.currentBattle.strengthPerWave)
+    end
     
     self.needReload = true
 end
@@ -120,7 +126,9 @@ function WarController:ResetBattle()
         System.RemoveEntity(self.currentBattle.cuman_point.id)
         self.currentBattle.cuman_point = nil
     end
-    
+    for k in pairs (self.currentBattle.strengthPerWave) do
+        self.currentBattle.strengthPerWave[k] = nil
+    end
     Utils.DeepCopyTable(WarStrengthPerWave, self.currentBattle.strengthPerWave)
     self.currentBattle.kills = 0
     self.currentBattle.numCuman = 0
@@ -157,7 +165,10 @@ function WarController:Spawn(side, position, objective, troopType)
     entity.soul:AddPerk(string.upper("d2da2217-d46d-4cdb-accb-4ff860a3d83e")) -- perfect block
     entity.soul:AddPerk(string.upper("ec4c5274-50e3-4bbf-9220-823b080647c4")) -- riposte
     entity.soul:AddPerk(string.upper("3e87c467-681d-48b5-9a8c-485443adcd42")) -- pommel strike
-    
+    entity.soul:AdvanceToSkillLevel("defense",14)
+    --entity.soul:AdvanceToSkillLevel("fencing",14)
+    entity.soul:AdvanceToSkillLevel("weapon_large",12)
+    entity.soul:AdvanceToSkillLevel("weapon_sword",12)
     local initmsg = Utils.makeTable('skirmish:init',{controller=player.this.id,isEnemy=isEnemy,oponentsNode=player.this.id,useQuickTargeting=true,targetingDistance=5.0, useMassBrain=true})
     XGenAIModule.SendMessageToEntityData(entity.this.id,'skirmish:init',initmsg);
     local initmsg2 = Utils.makeTable('skirmish:soundSetup',{ intensity=1.0, intensityPerEnemy=0.2, trigger="battle_ambient"})
@@ -196,7 +207,10 @@ function WarController:SpawnSpecial(side, position, troopType, radius)
     entity.soul:AddPerk(string.upper("d2da2217-d46d-4cdb-accb-4ff860a3d83e")) -- perfect block
     entity.soul:AddPerk(string.upper("ec4c5274-50e3-4bbf-9220-823b080647c4")) -- riposte
     entity.soul:AddPerk(string.upper("3e87c467-681d-48b5-9a8c-485443adcd42")) -- pommel strike
-    
+    entity.soul:AdvanceToSkillLevel("defense",24)
+    entity.soul:AdvanceToSkillLevel("weapon_unarmed",20)
+    entity.soul:AdvanceToSkillLevel("weapon_large",20)
+    entity.soul:AdvanceToSkillLevel("weapon_sword",20)
     local initmsg = Utils.makeTable('skirmish:init',{controller=player.this.id,isEnemy=isEnemy,oponentsNode=player.this.id,useQuickTargeting=true,targetingDistance=5.0, useMassBrain=true})
     XGenAIModule.SendMessageToEntityData(entity.this.id,'skirmish:init',initmsg);
     
@@ -208,17 +222,19 @@ function WarController:SpawnSquad(side, position, objective)
     local strengthFuzz = self.currentBattle.strengthPerWave[WarTroopTypes.halberd][side]
     -- fuzz halberd strength because they are the meat and potatoes of a squad
     strengthFuzz = strengthFuzz + math.random(0, WarConstants.squadNumberVariance) - math.random(0,WarConstants.squadNumberVariance)
-    for i=0,strengthFuzz,1 do
+    
+    -- lua is not 0 indexed, start loops at 1
+    for i=1,strengthFuzz,1 do
         self:Spawn(side, position, objective, WarTroopTypes.halberd)
     end
     
-    for i=0,self.currentBattle.strengthPerWave[WarTroopTypes.knight][side],1 do
+    for i=1,self.currentBattle.strengthPerWave[WarTroopTypes.knight][side],1 do
         self:Spawn(side, position, objective, WarTroopTypes.knight)
     end
-    for i=0,self.currentBattle.strengthPerWave[WarTroopTypes.aux][side],1 do
+    for i=1,self.currentBattle.strengthPerWave[WarTroopTypes.aux][side],1 do
         self:Spawn(side, position,objective, WarTroopTypes.aux)
     end    
-    for i=0,self.currentBattle.strengthPerWave[WarTroopTypes.bow][side],1 do
+    for i=1,self.currentBattle.strengthPerWave[WarTroopTypes.bow][side],1 do
         self:Spawn(side, position,objective, WarTroopTypes.bow)
     end
 end
@@ -364,7 +380,7 @@ function WarController:Brief()
         message = message .. "Bohemian Halberdiers: " .. self.currentBattle.strengthPerWave[WarTroopTypes.halberd][WarConstants.rat_side] .. "\n"
         message = message .. "Bohemian Auxiliaries: " .. self.currentBattle.strengthPerWave[WarTroopTypes.aux][WarConstants.rat_side] .. "\n"
         message = message .. "Bohemian Archers: " .. self.currentBattle.strengthPerWave[WarTroopTypes.bow][WarConstants.rat_side] .. "\n\n"
-        message = message .. "Cuman Strength: Medium\n\n"
+        message = message .. "Cuman Strength: " .. self:DetermineDifficultyText() .. "\n\n"
         message = message .. "Available Reinforcement Waves: " .. self.currentBattle.wavesleft
         Game.ShowTutorial(message, 20, false, true)
 end
@@ -434,13 +450,33 @@ function WarController:CheckDeaths()
     end
 end
 
-function WarController:DetermineDifficulty()
-    if self.regionalInfluence > WarDifficulty.hard then
-    
+function WarController:DetermineDifficultyText()
+    if self.regionalInfluence > WarDifficulty.veryhard then
+        return "Very Hard"
     elseif self.regionalInfluence > WarDifficulty.hard then
+        return "Hard"
     elseif self.regionalInfluence > WarDifficulty.medium then
-    
+        return "Medium"
     else
+        return "Easy"
+    end
+end
+
+-- temp numbers
+function WarController:DetermineDifficulty()
+    if self.regionalInfluence > WarDifficulty.veryhard then
+        self.Properties.controller.currentBattle.strengthPerWave[WarTroopTypes.knight][WarConstants.cuman_side] = 4
+        self.Properties.controller.currentBattle.strengthPerWave[WarTroopTypes.bow][WarConstants.cuman_side] = 3
+        self.Properties.controller.currentBattle.strengthPerWave[WarTroopTypes.halberd][WarConstants.cuman_side] = 3
+        self.Properties.controller.currentBattle.strengthPerWave[WarTroopTypes.aux][WarConstants.cuman_side] = 0
+    elseif self.regionalInfluence > WarDifficulty.hard then
+        self.Properties.controller.currentBattle.strengthPerWave[WarTroopTypes.knight][WarConstants.cuman_side] = 3
+        self.Properties.controller.currentBattle.strengthPerWave[WarTroopTypes.bow][WarConstants.cuman_side] = 1
+    elseif self.regionalInfluence > WarDifficulty.medium then
+        
+    else
+        self.Properties.controller.currentBattle.strengthPerWave[WarTroopTypes.halberd][WarConstants.cuman_side] = 2
+        self.Properties.controller.currentBattle.strengthPerWave[WarTroopTypes.aux][WarConstants.cuman_side] = 3
     end
 end
 
@@ -450,7 +486,7 @@ function WarController:ReadyForBattle()
     -- we are not guaranteed that a key may be numeric
     if self.inBattle == false and self.readyForNewBattle == true then
         local keyset = {}
-        for k in pairs(WarLocationstest) do
+        for k in pairs(WarLocations) do
             table.insert(keyset, k)
         end
         local idx = math.random(#keyset)
@@ -463,13 +499,18 @@ function WarController:ReadyForBattle()
             end
         end
         
-        local location = WarLocationstest[keyset[idx]]
+        local location = WarLocations[keyset[idx]]
         self.ignoreLocationIdx = idx
         message = "The War Marshal sends you word. Troops are gathering for a battle at "
         message = message .. location.name .. " and would like your help"
-        Game.SendInfoText(message,false,nil,20)
+        Game.SendInfoText(message,false,nil,10)
+        for k in pairs (self.currentBattle.strengthPerWave) do
+            self.currentBattle.strengthPerWave[k] = nil
+        end
         -- reset strengths
         Utils.DeepCopyTable(WarStrengthPerWave, self.currentBattle.strengthPerWave)
+        
+        self:DetermineDifficulty()
         self.nextBattleLocation = location
         self:CreateMarshal(location.camp)
     end

@@ -15,6 +15,13 @@ WarConstants = {
     
 }
 
+WarEvents = {
+    cumanMoreArchers = 0,
+    lessWaves = 1,
+    cumanAmbush = 2,
+    rattayAmbush = 3
+}
+
 WarRewards = {
     base = 250,
     perWave = 150,
@@ -102,6 +109,18 @@ WarLocations = {
         name="Sasau Outskirts",
         resourceNode = false,
         influence = 9,
+    },
+    {
+        center = {x = 3241.431,y= 1622.319,z= 125.2832}, rat = {x = 3318.59,y = 1606.279,z = 134.142}, cuman = {x = 3148.392,y= 1617.583,z= 134.8769 }, camp = { x = 3327.961, y = 1607.87, z = 137.135 },
+        name="Glade by Neuhof",
+        resourceNode = false,
+        influence = 7,
+    },
+    {
+        center = {x = 3185.878,y= 2788.162,z= 172.306}, rat = {x = 3190.970,y = 2679.227,z = 178.983}, cuman = {x = 3119.160,y= 2775.543,z= 178.973 }, camp = { x = 3208.894, y = 2679.775, z = 182.106 },
+        name="Uzhitz Farmstead",
+        resourceNode = false,
+        influence = 8,
     }
 }
 

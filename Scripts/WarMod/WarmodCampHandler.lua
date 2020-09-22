@@ -24,7 +24,7 @@ function WarController:AssignActionsLogiOfficer(entity)
         return output
     end
     entity.Properties.controller = self
-    entity.OnArcher = function (self, user)
+    entity.OnWave = function (self, user)
         if player.inventory:GetMoney() < 200 then
             Game.SendInfoText("You need 200 Groschen",false,nil,5)
         else
