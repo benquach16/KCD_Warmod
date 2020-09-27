@@ -8,7 +8,7 @@ WarConstants = {
     waveCost = 200,
     numWaves = 8,
     corpseTime = 15000, --15 seconds
-    victoryTime = 20000, -- 30 seconds
+    victoryTime = 20000, -- 20 seconds
     waveInterval = 75000, -- 75 seconds
     campMesh = "objects/structures/tent_cuman/tent_cuman_v6_b.cgf",
     squadNumberVariance = 1,
@@ -25,7 +25,7 @@ WarEvents = {
 WarRewards = {
     base = 250,
     perWave = 150,
-    perKill = 4,
+    perKill = 6,
 }
 
 WarTroopTypes = {
@@ -38,6 +38,7 @@ WarTroopTypes = {
     aux_light = 6
 }
 
+-- is this still worth it? event system can substitute some of this
 BattleTypes = {
     Attack = 0,
     Defend = 1,
@@ -96,7 +97,7 @@ WarLocations = {
         center = {x = 3136.570,y= 854.815,z= 122.557}, rat = {x = 2995.868,y = 809.014,z = 113.108}, cuman = {x = 3136.570,y= 854.815,z= 122.557}, camp = { x = 2979.425, y = 801.855, z = 110.145 },
         name="Rattay Farmhouse",
         resourceNode = false,
-        influence = 8,
+        influence = 12,
     },
     {
         center = {x = 2145.845,y= 967.7307,z= 76.2557}, rat = {x = 2242.227,y = 925.3737,z = 77.3386}, cuman = {x = 2037.570,y= 956.5421,z= 71.7819}, camp = { x = 2264.966, y = 917.7789, z = 76.5017 },
@@ -108,7 +109,7 @@ WarLocations = {
         center = {x = 657.9334,y= 1478.049,z= 47.2376}, rat = {x = 745.2598,y = 1542.538,z = 45.724}, cuman = {x = 606.0286,y= 1462.844,z= 45.5769 }, camp = { x = 762.5239, y = 1541.537, z = 42.5058 },
         name="Sasau Outskirts",
         resourceNode = false,
-        influence = 9,
+        influence = 12,
     },
     {
         center = {x = 3241.431,y= 1622.319,z= 125.2832}, rat = {x = 3318.59,y = 1606.279,z = 134.142}, cuman = {x = 3148.392,y= 1617.583,z= 134.8769 }, camp = { x = 3327.961, y = 1607.87, z = 137.135 },
@@ -119,6 +120,30 @@ WarLocations = {
     {
         center = {x = 3185.878,y= 2788.162,z= 172.306}, rat = {x = 3190.970,y = 2679.227,z = 178.983}, cuman = {x = 3119.160,y= 2775.543,z= 178.973 }, camp = { x = 3208.894, y = 2679.775, z = 182.106 },
         name="Uzhitz Farmstead",
+        resourceNode = false,
+        influence = 8,
+    },
+    {
+        center = {x = 2429.339,y= 1431.145,z= 26.173}, rat = {x = 2478.896,y = 1460.795,z = 28.472}, cuman = {x = 2452.467,y=1358.63,z= 30.273 }, camp = { x = 2490.646, y = 1471.634, z = 28.122 },
+        name="Waterway Crossing",
+        resourceNode = false,
+        influence = 5,
+    },
+    {
+        center = {x = 1278.3,y=1086.085,z=18.95}, rat = {x =1280.972,y =1028.137,z = 28.3514}, cuman = {x =1320.383,y=1100.662,z=22.02 }, camp = { x =1309.143, y = 1017.945, z = 27 },
+        name="West Forest Camp",
+        resourceNode = false,
+        influence = 9,
+    },
+    {
+        center = {x = 2211.522,y=2168.705,z=137.704}, rat = {x =2141.664,y =2224.004,z = 157.082}, cuman = {x =2241.437,y=2129.12,z=132.246 }, camp = { x =2135.879, y = 2236.649, z = 160.322 },
+        name="Road to Merhojed",
+        resourceNode = false,
+        influence = 13,
+    },
+    {
+        center = {x = 860.044,y=2197.744,z=37.991}, rat = {x =960.596,y =2204.601,z = 49.582}, cuman = {x =783.346,y=2228.012,z=33.163 }, camp = { x =926.977, y = 2184.792, z = 52.91 },
+        name="Field by Samopesh",
         resourceNode = false,
         influence = 8,
     }
@@ -167,7 +192,9 @@ Battle = {
     kills = 0,
     
     ratCommander = nil,
-    cumanCommander = nil
+    cumanCommander = nil,
+    
+    currentEvent = nil
 }
 
 WarController = {
