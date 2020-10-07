@@ -28,9 +28,7 @@ function WarController:DestroyMarshal()
         self.marshal:DestroyPhysics();
         
         System.RemoveEntity(self.marshal.id)
-        System.RemoveEntity(self.warcamp.id)
         self.marshal = nil
-        self.warcamp = nil
     end
     if self.logiOfficer ~= nil then
         self.logiOfficer.soul:DealDamage(200,200)
@@ -43,7 +41,6 @@ end
 function WarController:OnSave(table)
     --this should be easy because all troops and entities should be cleared before any save action
     table.marshal = self.marshal:GetGUID()
-    table.warcamp = self.warcamp:GetGUID()
     table.logiOfficer = self.logiOfficer:GetGUID()
     -- reuse this to index on load due to table shallow copy issues
     table.ignoreLocationIdx = self.ignoreLocationIdx
@@ -53,17 +50,12 @@ function WarController:OnSave(table)
     table.currentBattle.wavesleft = self.currentBattle.wavesleft
     table.currentBattle.strengthPerWave = {}
     Utils.DeepCopyTable(self.currentBattle.strengthPerWave, table.currentBattle.strengthPerWave)
+    table.currentBattle.currentEvent = self.currentBattle.currentEvent
 end
 
 function WarController:OnLoad(table)
     self.marshal = System.GetEntityByGUID(table.marshal)
-    self.warcamp = System.GetEntityByGUID(table.warcamp)
     self.logiOfficer = System.GetEntityByGUID(table.logiOfficer)
-    if self.warcamp ~= nil then
-        self.warcamp:LoadObject(0, WarConstants.campMesh)
-        local Physics = self.warcamp.Properties.Physics;
-        EntityCommon.PhysicalizeRigid(self.warcamp, 0, Physics, self.warcamp.bRigidBodyActive);
-    end
     
     self.ignoreLocationIdx = table.ignoreLocationIdx
     self.nextBattleLocation = WarLocations[self.ignoreLocationIdx]
@@ -71,6 +63,7 @@ function WarController:OnLoad(table)
     if table.currentBattle ~= nil then
         self.currentBattle.wavesleft = table.currentBattle.wavesleft
         Utils.DeepCopyTable(table.currentBattle.strengthPerWave, self.currentBattle.strengthPerWave)
+        self.currentBattle.currentEvent = table.currentBattle.currentEvent
     end
     
     self.needReload = true
@@ -112,6 +105,7 @@ end
 function WarController:ResetBattle()
     self.currentBattle.wavesleft = WarConstants.numWaves
     self.currentBattle.locations = nil
+    self.currentBattle.currentEvent = nil
     self.inBattle = false
     
     if self.currentBattle.center ~= nil then
@@ -155,7 +149,7 @@ function WarController:CreateAITagPoint(location)
     return entity
 end
 
-function WarController:GenerateBattle()
+function WarController:StartBattle()
     if self.inBattle == false and self.readyForNewBattle == true and self.nextBattleLocation ~= nil then
         QuestSystem.CompleteObjective("quest_warmod", "startBattle")
         local spawnParams = {}
@@ -236,6 +230,17 @@ function WarController:Brief()
         Game.ShowTutorial(message, 20, false, true)
 end
 
+function WarController:Scout()
+        message = "<font color='#333333' size='28'>Scouting Information\n\n</font>"
+        if self.currentBattle.currentEvent == nil then
+            message = message .. "Scouts report nothing unusual at the moment\n\n"
+        else
+            message = message .. self:ReportEvent()
+        end
+        Game.ShowTutorial(message, 20, false, true)
+end
+
+
 function WarController:DetermineVictor()
     if self.currentBattle.ratCommander.soul:GetState("health") < 1 then
         Game.SendInfoText("Your commander has died! The battle was a defeat!",false,nil,10)
@@ -302,6 +307,8 @@ function WarController:CheckDeaths()
 end
 
 function WarController:DetermineDifficultyText()
+    if self.regionalInfluence > WarDifficulty.impossible then
+        return "Impossible"
     if self.regionalInfluence > WarDifficulty.veryhard then
         return "Very Hard"
     elseif self.regionalInfluence > WarDifficulty.hard then
@@ -315,20 +322,67 @@ end
 
 -- temp numbers
 function WarController:DetermineDifficulty()
-    if self.regionalInfluence > WarDifficulty.veryhard then
-        self.Properties.controller.currentBattle.strengthPerWave[WarTroopTypes.knight][WarConstants.cuman_side] = 4
-        self.Properties.controller.currentBattle.strengthPerWave[WarTroopTypes.bow][WarConstants.cuman_side] = 3
-        self.Properties.controller.currentBattle.strengthPerWave[WarTroopTypes.halberd][WarConstants.cuman_side] = 3
-        self.Properties.controller.currentBattle.strengthPerWave[WarTroopTypes.aux][WarConstants.cuman_side] = 0
+    if self.regionalInfluence > WarDifficulty.impossible then
+        self.currentBattle.strengthPerWave[WarTroopTypes.knight][WarConstants.cuman_side] = 6
+        self.currentBattle.strengthPerWave[WarTroopTypes.bow][WarConstants.cuman_side] = 3
+        self.currentBattle.strengthPerWave[WarTroopTypes.halberd][WarConstants.cuman_side] = 2
+        self.currentBattle.strengthPerWave[WarTroopTypes.aux][WarConstants.cuman_side] = 0
+    elseif self.regionalInfluence > WarDifficulty.veryhard then
+        self.currentBattle.strengthPerWave[WarTroopTypes.knight][WarConstants.cuman_side] = 4
+        self.currentBattle.strengthPerWave[WarTroopTypes.bow][WarConstants.cuman_side] = 3
+        self.currentBattle.strengthPerWave[WarTroopTypes.halberd][WarConstants.cuman_side] = 3
+        self.currentBattle.strengthPerWave[WarTroopTypes.aux][WarConstants.cuman_side] = 0
     elseif self.regionalInfluence > WarDifficulty.hard then
-        self.Properties.controller.currentBattle.strengthPerWave[WarTroopTypes.bow][WarConstants.cuman_side] = 2
+        self.currentBattle.strengthPerWave[WarTroopTypes.bow][WarConstants.cuman_side] = 2
+        self.currentBattle.strengthPerWave[WarTroopTypes.aux][WarConstants.cuman_side] = 2
     elseif self.regionalInfluence > WarDifficulty.medium then
         
     else
-        self.Properties.controller.currentBattle.strengthPerWave[WarTroopTypes.halberd][WarConstants.cuman_side] = 2
-        self.Properties.controller.currentBattle.strengthPerWave[WarTroopTypes.aux][WarConstants.cuman_side] = 3
-        self.Properties.controller.currentBattle.strengthPerWave[WarTroopTypes.knight][WarConstants.cuman_side] = 1
+        self.currentBattle.strengthPerWave[WarTroopTypes.halberd][WarConstants.cuman_side] = 2
+        self.currentBattle.strengthPerWave[WarTroopTypes.aux][WarConstants.cuman_side] = 3
+        self.currentBattle.strengthPerWave[WarTroopTypes.knight][WarConstants.cuman_side] = 1
     end
+end
+
+function WarController:GenerateRandomKey(tbl)
+    local keyset = {}
+    for k in pairs(tbl) do
+        table.insert(keyset, k)
+    end
+    local key = math.random(#keyset)
+    return keyset[key]
+end
+
+function WarController:GenerateEvent()
+    if math.random(100) <= WarConstants.eventChance then
+        local key = self:GenerateRandomKey(WarEvents)
+        self.currentBattle.currentEvent = WarEvents[key]
+        local message = self:ReportEvent()
+        Game.SendInfoText(message,false,nil,10)
+        
+        if WarEvents[key] == WarEvents.cumanMoreArchers then
+            self.currentBattle.strengthPerWave[WarTroopTypes.bow][WarConstants.cuman_side] = 4
+        elseif WarEvents[key] == WarEvents.ratMoreArchers then
+            self.currentBattle.strengthPerWave[WarTroopTypes.bow][WarConstants.rat_side] = 4
+        elseif WarEvents[key] == WarEvents.lessWaves then
+            self.currentBattle.wavesleft = 4
+        end
+    end
+end
+
+function WarController:ReportEvent()
+    local event = self.currentBattle.currentEvent
+    local message = ""
+    if event == WarEvents.cumanMoreArchers then
+        message = message .. "Our scouts have reported that the enemy is bringing a large amount of archers to the next battle." 
+    end
+    if event == WarEvents.ratMoreArchers then
+        message = message .. "Sir Hanush has mustered up some additional archers. They will be deployed with us in the next battle." 
+    end
+    if event == WarEvents.lessWaves then
+        message = message .. "Our logistics train has fallen behind! We cannot provide as many troop waves in the next battle." 
+    end
+    return message
 end
 
 -- Determines battle setup, as well as difficulty
@@ -355,11 +409,15 @@ function WarController:ReadyForBattle()
         message = "The War Marshal sends you word. Troops are gathering for a battle at "
         message = message .. location.name .. " and would like your help"
         Game.SendInfoText(message,false,nil,10)
+        
         for k in pairs (self.currentBattle.strengthPerWave) do
             self.currentBattle.strengthPerWave[k] = nil
         end
         -- reset strengths
         Utils.DeepCopyTable(WarStrengthPerWave, self.currentBattle.strengthPerWave)
+        
+        -- must generate event after strengths have been reset
+        self:GenerateEvent()
         
         self:DetermineDifficulty()
         self.nextBattleLocation = location
@@ -375,12 +433,12 @@ function WarController:OnUpdate(delta)
         if self.marshal ~= nil then
             self:AssignActions(self.marshal)
             self.marshal:SetViewDistUnlimited()
-            self.warcamp:SetViewDistUnlimited()
         end
         if self.logiOfficer ~= nil then
             self:AssignActionsLogiOfficer(self.logiOfficer)
             self.logiOfficer:SetViewDistUnlimited()
         end
+        self:CreateWarCamp(self.nextBattleLocation.camp)
         self.needReload = false
     else
         if self.inBattle == true then

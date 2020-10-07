@@ -20,17 +20,11 @@ function War_Mod.endearly()
     War_Mod.currController.currentBattle.cumanCommander.soul:DealDamage(200,200)
 end
 
-function War_Mod.testbow()
-    local spawnParams = {}
-    spawnParams.class = "NPC"
-    spawnParams.orientation = { x = 0, y = 0, z = 0 }
-    --local vec = { x = 2979.425, y = 801.855, z = 111.145 }
-    spawnParams.position = player:GetWorldPos()
-    spawnParams.properties = {}
-    spawnParams.properties.sharedSoulGuid = "822cfefc-4d92-4fa4-824a-f772b511eeca"
-    local entity = System.SpawnEntity(spawnParams)
-        local initmsg = Utils.makeTable('skirmish:init',{controller=player.this.id,isEnemy=true,oponentsNode=player.this.id,useQuickTargeting=true,targetingDistance=5.0, useMassBrain=true})
-    XGenAIModule.SendMessageToEntityData(entity.this.id,'skirmish:init',initmsg);
+function War_Mod.clearcamp()
+    local entity = System.GetEntityByName("warcamp")
+    if entity ~= nil then
+        System.RemoveEntity(entity.id)
+    end
 end
 
 function War_Mod.uninstall()
@@ -51,7 +45,7 @@ function War_Mod.create()
     War_Mod.currController = entity
 end
 
-System.AddCCommand("warmodbow", "War_Mod.testbow()", "[Debug] test follower")
 System.AddCCommand("warmod_uninstall", "War_Mod.uninstall()", "[Debug] test follower")
 System.AddCCommand("warmod", "War_Mod.create()", "[Debug] test follower")
 System.AddCCommand("warmod_kill", "War_Mod.endearly()", "[Debug] test follower")
+System.AddCCommand("warmod_clearcamp", "War_Mod.clearcamp()", "[Debug] test follower")

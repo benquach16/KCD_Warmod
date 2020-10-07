@@ -10,16 +10,41 @@ WarConstants = {
     corpseTime = 15000, --15 seconds
     victoryTime = 20000, -- 20 seconds
     waveInterval = 75000, -- 75 seconds
+    
+    -- todo: put this in another data structure that will help set up a whole encampment
     campMesh = "objects/structures/tent_cuman/tent_cuman_v6_b.cgf",
     squadNumberVariance = 1,
     
+    eventChance = 40 -- clamp this to 0 to 100
+}
+
+WarEncampmentMeshes = {
+    { -- tent
+        mesh = "objects/structures/tent_cuman/tent_cuman_v6_b.cgf",
+        class = "BasicEntity",
+        offset = { x = 0, y = 0, z = 0 },
+        orientation = { x = 1, y = 0, z = 0}
+    },
+    { -- table or something
+        mesh = "objects/structures/tent_cuman/tent_cuman_v6_b.cgf",
+        class = "BasicEntity",
+        offset = { x = 0, y = 0, z = 0 },
+        orientation = { x = 1, y = 0, z = 0}
+    },
+    { -- weapons rack
+        mesh = "objects/structures/tent_cuman/tent_cuman_v6_b.cgf",
+        class = "BasicEntity",
+        offset = { x = 0, y = 0, z = 0 },
+        orientation = { x = 1, y = 0, z = 0}
+    },
 }
 
 WarEvents = {
     cumanMoreArchers = 0,
-    lessWaves = 1,
-    cumanAmbush = 2,
-    rattayAmbush = 3
+    ratMoreArchers = 1,
+    lessWaves = 2,
+    --cumanAmbush = 3,
+    --rattayAmbush = 4
 }
 
 WarRewards = {
@@ -57,7 +82,8 @@ WarDifficulty = {
     low = 0,
     medium = 40,
     hard = 80,
-    veryhard = 120
+    veryhard = 120,
+    impossible = 160
 }
 
 WarStrengthPerWave = {
@@ -71,7 +97,7 @@ WarStrengthPerWave[WarTroopTypes.knight][WarConstants.rat_side] = 1
 WarStrengthPerWave[WarTroopTypes.knight][WarConstants.cuman_side] = 2
 WarStrengthPerWave[WarTroopTypes.halberd] = {}
 WarStrengthPerWave[WarTroopTypes.halberd][WarConstants.rat_side] = 4
-WarStrengthPerWave[WarTroopTypes.halberd][WarConstants.cuman_side] = 6
+WarStrengthPerWave[WarTroopTypes.halberd][WarConstants.cuman_side] = 5
 WarStrengthPerWave[WarTroopTypes.aux] = {}
 WarStrengthPerWave[WarTroopTypes.aux][WarConstants.rat_side] = 1
 WarStrengthPerWave[WarTroopTypes.aux][WarConstants.cuman_side] = 1
@@ -92,6 +118,7 @@ WarGuids[WarTroopTypes.bow] = {}
 WarGuids[WarTroopTypes.bow][WarConstants.rat_side] = "822cfefc-4d92-4fa4-824a-f772b511eeca"
 WarGuids[WarTroopTypes.bow][WarConstants.cuman_side] = "8f876dd6-9457-4072-b8f8-693de5debaad"
 
+
 WarLocations = {
     {
         center = {x = 3136.570,y= 854.815,z= 122.557}, rat = {x = 2995.868,y = 809.014,z = 113.108}, cuman = {x = 3136.570,y= 854.815,z= 122.557}, camp = { x = 2979.425, y = 801.855, z = 110.145 },
@@ -100,8 +127,8 @@ WarLocations = {
         influence = 12,
     },
     {
-        center = {x = 2145.845,y= 967.7307,z= 76.2557}, rat = {x = 2242.227,y = 925.3737,z = 77.3386}, cuman = {x = 2037.570,y= 956.5421,z= 71.7819}, camp = { x = 2264.966, y = 917.7789, z = 76.5017 },
-        name="Ledetchko Encampment",
+        center = {x = 2089.945,y= 975.7307,z= 73.8557}, rat = {x = 2151.766,y = 1075.697,z = 59.3605}, cuman = {x = 2037.570,y= 956.5421,z= 71.7819}, camp = { x = 2164.941, y = 1090.227, z = 54.1317 },
+        name="Ledetchko Assault",
         resourceNode = false,
         influence = 5,
     },
@@ -136,7 +163,7 @@ WarLocations = {
         influence = 9,
     },
     {
-        center = {x = 2211.522,y=2168.705,z=137.704}, rat = {x =2141.664,y =2224.004,z = 157.082}, cuman = {x =2241.437,y=2129.12,z=132.246 }, camp = { x =2135.879, y = 2236.649, z = 160.322 },
+        center = {x = 2211.522,y=2168.705,z=137.704}, rat = {x =2141.664,y =2224.004,z = 157.082}, cuman = {x =2241.437,y=2129.12,z=132.246 }, camp = { x =2135.879, y = 2236.649, z = 159.522 },
         name="Road to Merhojed",
         resourceNode = false,
         influence = 13,
@@ -152,9 +179,20 @@ WarLocations = {
 -- If your Regional Influence gets too low, enemy starts doing raids on towns and cities
 WarRaidLocations = {
     {
-        target = { x = 20, y = 20, z = 20 },
-        start = { x = 30, y = 30, z = 20 },
-        name = "Rattay"
+        rat = {x =2558.429,y =463.0462,z = 68.1582}, cuman = {x =2370.252,y=558.5708,z=32.163 }, camp = { x =2552.782, y = 512.0674, z = 72.5 },
+        name="Pirkstein Defense",
+        resourceNode = false,
+        influence = 15,
+    }
+}
+
+-- If your Regional Influence gets too high, you start making assaults on enemy camps
+WarAssaultLocations = {
+    {
+        rat = {x =2558.429,y =463.0462,z = 68.1582}, cuman = {x =2370.252,y=558.5708,z=32.163 }, camp = { x =2552.782, y = 512.0674, z = 72.5 },
+        name="Skalitz Camp Assault",
+        resourceNode = false,
+        influence = 15,
     }
 }
 
@@ -212,7 +250,6 @@ WarController = {
     -- misnomer because its really a key
     ignoreLocationIdx = -1,
     marshal = nil,
-    warcamp = nil,
     logiOfficer = nil,
     regionalInfluence = 50,
     
