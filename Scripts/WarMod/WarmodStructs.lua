@@ -2,6 +2,7 @@
 WarConstants = {
     cSaveLockName = "warmodsavelock",
     cMarshalName = "warmodmarshal",
+    -- todo: inconsistent naming schema, change to camel case
     rat_side = 1,
     cuman_side = 2,
     troopCost = 100,
@@ -169,10 +170,28 @@ WarLocations = {
         influence = 13,
     },
     {
-        center = {x = 860.044,y=2197.744,z=37.991}, rat = {x =960.596,y =2204.601,z = 49.582}, cuman = {x =783.346,y=2228.012,z=33.163 }, camp = { x =926.977, y = 2184.792, z = 52.91 },
+        center = {x = 860.044,y=2197.744,z=37.991}, rat = {x =919.13,y =2201.141,z = 48.582}, cuman = {x =800.501,y=2239.367,z=30.563 }, camp = { x =926.977, y = 2184.792, z = 52.51 },
         name="Field by Samopesh",
         resourceNode = false,
         influence = 8,
+    },
+    {
+        center = {x = 370.944,y=1878.444,z=17.991}, rat = {x =364.72,y =1859.137,z = 18.382}, cuman = {x =320.63355,y=1912.88,z=20.5 }, camp = { x=369.22,y =1851.437,z = 20.582 },
+        name="Bridge Crossing",
+        resourceNode = false,
+        influence = 7,
+    },
+    {
+        center = {x = 858.944,y=2661.044,z=52.991}, rat = {x =814.4106,y =2680.68,z = 75.3123}, cuman = {x =866.9485,y=2747.528,z=57.06 }, camp = { x=802.9427,y =2672.488,z = 81.0 },
+        name="South Skalitz Mineshaft",
+        resourceNode = false,
+        influence = 11,
+    },
+    {
+        center = {x = 985.0812,y=2748.828,z=72.991}, rat = {x =1028.441,y =2791.381,z = 67.3123}, cuman = {x =983.0874,y=2666.154,z=57.6 }, camp = {x =1025.441,y =2800.381,z = 68.3123},
+        name="Mountainside Assault",
+        resourceNode = false,
+        influence = 11,
     }
 }
 
@@ -180,7 +199,13 @@ WarLocations = {
 WarRaidLocations = {
     {
         rat = {x =2558.429,y =463.0462,z = 68.1582}, cuman = {x =2370.252,y=558.5708,z=32.163 }, camp = { x =2552.782, y = 512.0674, z = 72.5 },
-        name="Pirkstein Defense",
+        name="Castle Pirkstein and Rattay",
+        resourceNode = false,
+        influence = 15,
+    },
+    {
+        rat = {x =911.6,y =1703.476,z = 43.7582}, cuman = {x =805.8848,y=1708.74,z=59.8 }, camp = { x =908, y = 1697.313, z = 42.7 },
+        name="Sasau Monastary",
         resourceNode = false,
         influence = 15,
     }
@@ -189,7 +214,7 @@ WarRaidLocations = {
 -- If your Regional Influence gets too high, you start making assaults on enemy camps
 WarAssaultLocations = {
     {
-        rat = {x =2558.429,y =463.0462,z = 68.1582}, cuman = {x =2370.252,y=558.5708,z=32.163 }, camp = { x =2552.782, y = 512.0674, z = 72.5 },
+        rat = {x =866.8859,y =3199.533,z = 23.8}, cuman = {x =870.2924,y=3336.631,z=24.963 }, camp = { x =854.09, y = 3177.754, z = 32.4 },
         name="Skalitz Camp Assault",
         resourceNode = false,
         influence = 15,
@@ -232,7 +257,10 @@ Battle = {
     ratCommander = nil,
     cumanCommander = nil,
     
-    currentEvent = nil
+    currentEvent = nil,
+    isDefense = false,
+    isAssault = false,
+    
 }
 
 WarController = {
@@ -243,7 +271,10 @@ WarController = {
     inBattle = false,
     readyForNewBattle = true,
     currentBattle = Battle,
+    -- important - this can refer to different structures, war locations, war raid locations, etc
     nextBattleLocation = nil,
+    
+
     -- in gametime
     timeBattleStarted = 0, 
     -- try not to repeat the same location multiple times

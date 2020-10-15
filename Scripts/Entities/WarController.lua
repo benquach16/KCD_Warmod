@@ -36,6 +36,10 @@ function WarController:DestroyMarshal()
         System.RemoveEntity(self.logiOfficer.id)
         self.logiOfficer = nil
     end
+    if self.warcamp ~= nil then
+        System.RemoveEntity(self.warcamp.id)
+        self.warcamp = nil
+    end
 end
 
 function WarController:OnSave(table)
@@ -51,6 +55,8 @@ function WarController:OnSave(table)
     table.currentBattle.strengthPerWave = {}
     Utils.DeepCopyTable(self.currentBattle.strengthPerWave, table.currentBattle.strengthPerWave)
     table.currentBattle.currentEvent = self.currentBattle.currentEvent
+    table.currentBattle.isDefense = self.currentBattle.isDefense
+    table.currentBattle.isAssault = self.currentBattle.isAssault
 end
 
 function WarController:OnLoad(table)
@@ -58,14 +64,21 @@ function WarController:OnLoad(table)
     self.logiOfficer = System.GetEntityByGUID(table.logiOfficer)
     
     self.ignoreLocationIdx = table.ignoreLocationIdx
-    self.nextBattleLocation = WarLocations[self.ignoreLocationIdx]
+    self.currentBattle.isDefense = table.currentBattle.isDefense
+    self.currentBattle.isAssault = table.currentBattle.isAssault
+    if self.currentBattle.isDefense == true then
+        self.nextBattleLocation = WarRaidLocations[self.ignoreLocationIdx]
+    else
+        self.nextBattleLocation = WarLocations[self.ignoreLocationIdx]
+    end
+    
     self.regionalInfluence = table.regionalInfluence
     if table.currentBattle ~= nil then
         self.currentBattle.wavesleft = table.currentBattle.wavesleft
         Utils.DeepCopyTable(table.currentBattle.strengthPerWave, self.currentBattle.strengthPerWave)
         self.currentBattle.currentEvent = table.currentBattle.currentEvent
     end
-    
+
     self.needReload = true
 end
 
@@ -129,6 +142,8 @@ function WarController:ResetBattle()
     self.currentBattle.kills = 0
     self.currentBattle.numCuman = 0
     self.currentBattle.numRattay = 0
+    self.currentBattle.isDefense = false
+    self.currentBattle.isAssault = false
 end
 
 function WarController.RemoveCorpse(entity)
@@ -218,8 +233,34 @@ function WarController:Debrief(won)
     end
 end
 
+function WarController:Debrief2(won)
+    QuestSystem.CompleteObjective("quest_warmod", "startBattle")
+    QuestSystem.CompleteObjective("quest_warmod", "finishBattle")
+    local influence = self.nextBattleLocation.influence + math.random(0,3) - math.random(0,3)
+    
+    self:DestroyMarshal()
+    if won == true then
+        self.regionalInfluence = self.regionalInfluence + influence
+        message = "<font color='#111111' size='24'>You won!\n\n</font>"
+        message = message .. "You gained " .. influence .. " Regional Influence\n"
+        message = message .. "Current Regional Influence: " .. self.regionalInfluence
+        Game.ShowTutorial(message, 20, false, true)
+    else
+        self.regionalInfluence = self.regionalInfluence - influence
+        self.regionalInfluence = math.max(self.regionalInfluence, 0)
+        message = "<font color='#111111' size='24'>You lost!\n\n</font>"
+        message = message .. "The Cumans have taken this location\n\n"
+        message = message .. "You lost " .. influence .. " Regional Influence\n"
+        message = message .. "Current Regional Influence: " .. self.regionalInfluence
+        Game.ShowTutorial(message, 20, false, true)
+    end
+end
+
 function WarController:Brief()
         message = "<font color='#333333' size='28'>Briefing\n\n</font>"
+        if self.currentBattle.isDefense == true then
+            message = message .. "<font color='#FF3333' size='28'>This is a city defense!\n\n</font>"
+        end
         message = message .. "Current Regional Influence: " .. self.regionalInfluence .. "\n\n"
         message = message .. "Bohemian Knights: " .. self.currentBattle.strengthPerWave[WarTroopTypes.knight][WarConstants.rat_side] .. "\n"
         message = message .. "Bohemian Halberdiers: " .. self.currentBattle.strengthPerWave[WarTroopTypes.halberd][WarConstants.rat_side] .. "\n"
@@ -240,14 +281,13 @@ function WarController:Scout()
         Game.ShowTutorial(message, 20, false, true)
 end
 
-
 function WarController:DetermineVictor()
     if self.currentBattle.ratCommander.soul:GetState("health") < 1 then
         Game.SendInfoText("Your commander has died! The battle was a defeat!",false,nil,10)
         
         self:Debrief(false)
         self:ResetBattle()
-        self:KillSide(WarConstants.rat_side)
+        --self:KillSide(WarConstants.rat_side)
         --they get time for victory
         Script.SetTimer(WarConstants.victoryTime, self.ClearTroops, self)
         return
@@ -309,7 +349,7 @@ end
 function WarController:DetermineDifficultyText()
     if self.regionalInfluence > WarDifficulty.impossible then
         return "Impossible"
-    if self.regionalInfluence > WarDifficulty.veryhard then
+    elseif self.regionalInfluence > WarDifficulty.veryhard then
         return "Very Hard"
     elseif self.regionalInfluence > WarDifficulty.hard then
         return "Hard"
@@ -385,47 +425,81 @@ function WarController:ReportEvent()
     return message
 end
 
+function WarController:GenerateRandomKey(tbl, ignore)
+    ignore = ignore or false
+    local keyset = {}
+    for k in pairs(tbl) do
+        table.insert(keyset, k)
+    end
+    local idx = math.random(#keyset)
+    
+    -- ignore location if we have already fought there
+    if #keyset > 1 and ignore == true then
+        while idx == self.ignoreLocationIdx do
+            idx = math.random(#keyset)
+        end
+    end
+    return keyset[idx]
+end
+
+function WarController:ResetStrengths()
+    for k in pairs (self.currentBattle.strengthPerWave) do
+        self.currentBattle.strengthPerWave[k] = nil
+    end
+    -- reset strengths
+    Utils.DeepCopyTable(WarStrengthPerWave, self.currentBattle.strengthPerWave)
+end
+
 -- Determines battle setup, as well as difficulty
 function WarController:ReadyForBattle()
     -- lua is really fucking annoying because there are only hash tables
     -- we are not guaranteed that a key may be numeric
     if self.inBattle == false and self.readyForNewBattle == true then
-        local keyset = {}
-        for k in pairs(WarLocations) do
-            table.insert(keyset, k)
-        end
-        local idx = math.random(#keyset)
-        
-        -- only ignore if we have more than 1 location
-        if #keyset > 1 then
-            -- try not to repeat same battle twice
-            while idx == self.ignoreLocationIdx do
-                idx = math.random(#keyset)
+        if self.regionalInfluence < WarDifficulty.low then
+            -- chance for defense battle
+            if math.random(2) == 2 then
+                self.currentBattle.isDefense = true
+            else
+                self.currentBattle.isDefense = false
             end
         end
-        
-        local location = WarLocations[keyset[idx]]
-        self.ignoreLocationIdx = idx
-        message = "The War Marshal sends you word. Troops are gathering for a battle at "
-        message = message .. location.name .. " and would like your help"
-        Game.SendInfoText(message,false,nil,10)
-        
-        for k in pairs (self.currentBattle.strengthPerWave) do
-            self.currentBattle.strengthPerWave[k] = nil
+        --self.currentBattle.isDefense = true
+        if self.currentBattle.isDefense ~= true then
+            local idx = self:GenerateRandomKey(WarLocations, true)
+            
+            local location = WarLocations[idx]
+            self.ignoreLocationIdx = idx
+            local message = "The War Marshal sends you word. Troops are gathering for a battle at "
+            message = message .. location.name .. " and would like your help"
+            Game.SendInfoText(message,false,nil,10)
+            
+            self:ResetStrengths()
+            -- must generate event after strengths have been reset
+            self:GenerateEvent()
+            
+            self:DetermineDifficulty()
+            self.nextBattleLocation = location
+            self:CreateMarshal(location.camp)
+        else
+            local idx = self:GenerateRandomKey(WarRaidLocations, false)
+            local location = WarRaidLocations[idx]
+            self.ignoreLocationIdx = idx
+            local message = "Warning! The Cumans are planning to attack "
+            message = message .. location.name .. "! Our towns and civilians are at risk!"
+            Game.SendInfoText(message,false,nil,10)
+            self:ResetStrengths()
+            
+            self:DetermineDifficulty()
+            self.nextBattleLocation = location
+            self:CreateMarshal(location.camp)
         end
-        -- reset strengths
-        Utils.DeepCopyTable(WarStrengthPerWave, self.currentBattle.strengthPerWave)
-        
-        -- must generate event after strengths have been reset
-        self:GenerateEvent()
-        
-        self:DetermineDifficulty()
-        self.nextBattleLocation = location
-        self:CreateMarshal(location.camp)
     end
 end
 
 function WarController:OffScreenBattle()
+    self:Debrief2(false)
+    self:ResetBattle()
+    self.ClearTroops(self)
 end
 
 function WarController:OnUpdate(delta)

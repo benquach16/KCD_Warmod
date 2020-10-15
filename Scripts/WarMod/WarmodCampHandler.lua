@@ -5,6 +5,7 @@ function WarController:AssignActions(entity)
         AddInteractorAction( output, firstFast, Action():hint("Start Battle"):action("use"):hintType( AHT_HOLD ):func(entity.OnStart):interaction(inr_talk))
         AddInteractorAction( output, firstFast, Action():hint("View Briefing"):action("use"):func(entity.OnBrief):interaction(inr_talk))
         AddInteractorAction( output, firstFast, Action():hint("View Scouting Information"):action("mount_horse"):func(entity.OnScout):interaction(inr_talk))
+        AddInteractorAction( output, firstFast, Action():hint("Resolve battle without me"):action("mount_horse"):hintType( AHT_HOLD ):func(entity.Resolve):interaction(inr_talk))
         return output
     end
     entity.Properties.controller = self
@@ -16,6 +17,9 @@ function WarController:AssignActions(entity)
     end
     entity.OnScout = function (self, user)
         self.Properties.controller:Scout()
+    end
+    entity.Resolve = function (self, user)
+        self.Properties.controller:OffScreenBattle()
     end
 end
 
